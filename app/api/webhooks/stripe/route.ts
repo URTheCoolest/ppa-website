@@ -13,8 +13,6 @@ export async function POST(req: NextRequest) {
   let event: Stripe.Event
 
   try {
-    // For now, we'll skip signature verification if no webhook secret is set
-    // In production, always verify!
     if (!process.env.STRIPE_WEBHOOK_SECRET) {
       console.log('No webhook secret set, skipping verification')
       event = JSON.parse(body)
@@ -28,7 +26,6 @@ export async function POST(req: NextRequest) {
 
   const supabase = await createClient()
 
-  // Handle checkout.session.completed
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session
     
@@ -38,11 +35,9 @@ export async function POST(req: NextRequest) {
     const amountPaid = session.amount_total ? session.amount_total / 100 : 0
 
     if (licenseRequestId) {
-      // Calculate split (80% photographer, 20% platform)
       const photographerShare = Math.round(amountPaid * 0.8 * 100) / 100
       const agencyShare = Math.round(amountPaid * 0.2 * 100) / 100
 
-      // Update license request status
       await supabase
         .from('license_requests')
         .update({ 
@@ -51,7 +46,6 @@ export async function POST(req: NextRequest) {
         })
         .eq('id', licenseRequestId)
 
-      // Update photographer earnings
       if (photographerId) {
         await supabase.rpc('add_photographer_earnings', {
           p_photographer_id: photographerId,
@@ -59,7 +53,6 @@ export async function POST(req: NextRequest) {
         })
       }
 
-      // Record transaction
       await supabase
         .from('transactions')
         .insert({
