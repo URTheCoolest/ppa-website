@@ -30,23 +30,31 @@ export async function POST(req: NextRequest) {
       const photographerId = session.metadata?.photographerId
       const amountPaid = session.amount_total ? session.amount_total / 100 : 0
 
+      console.log('Processing payment:', { licenseRequestId, clientId, photographerId, amountPaid })
+
       if (licenseRequestId) {
         const photographerShare = Math.round(amountPaid * 0.8 * 100) / 100
         const agencyShare = Math.round(amountPaid * 0.2 * 100) / 100
 
-        await supabase
+        // Update license request
+        const { error: updateError } = await supabase
           .from('license_requests')
           .update({ status: 'approved', completed_at: new Date().toISOString() })
           .eq('id', licenseRequestId)
 
-        if (photographerId) {
-          await supabase.rpc('add_photographer_earnings', {
+        console.log('License update result:', updateError)
+
+        // Update photographer earnings
+        if (photographerId && photographerShare > 0) {
+          const { error: rpcError } = await supabase.rpc('add_photographer_earnings', {
             p_photographer_id: photographerId,
             p_amount: photographerShare
           })
+          console.log('Earnings RPC result:', rpcError)
         }
 
-        await supabase
+        // Record transaction
+        const { error: insertError } = await supabase
           .from('transactions')
           .insert({
             client_id: clientId,
@@ -61,7 +69,8 @@ export async function POST(req: NextRequest) {
             transaction_id: session.payment_intent as string,
             completed_at: new Date().toISOString()
           })
-
+        
+        console.log('Transaction insert result:', insertError)
         console.log('Payment processed:', licenseRequestId)
       }
     }
