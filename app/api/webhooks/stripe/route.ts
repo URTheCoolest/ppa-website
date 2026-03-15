@@ -44,15 +44,6 @@ export async function POST(req: NextRequest) {
 
         console.log('License update result:', updateError)
 
-        // Update photographer earnings
-        if (photographerId && photographerShare > 0) {
-          const { error: rpcError } = await supabase.rpc('add_photographer_earnings', {
-            p_photographer_id: photographerId,
-            p_amount: photographerShare
-          })
-          console.log('Earnings RPC result:', rpcError)
-        }
-
         // Record transaction
         const { error: insertError } = await supabase
           .from('transactions')
