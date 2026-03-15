@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Light Theme (Default) */
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --secondary: #64748b;
+  --muted: #f1f5f9;
+  --muted-foreground: #475569;
+  --border: #e2e8f0;
+  --card: #ffffff;
+  --card-foreground: #171717;
+}
+
+/* Dark Theme */
+.dark {
+  --background: #000000;
+  --foreground: #ededed;
+  --primary: #3b82f6;
+  --primary-hover: #60a5fa;
+  --secondary: #94a3b8;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --border: #334155;
+  --card: #0f172a;
+  --card-foreground: #ededed;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+/* Dark mode support */
+.dark body {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+/* Tailwind utilities using CSS variables */
+.bg-white { background-color: var(--card); }
+.bg-gray-50 { background-color: var(--muted); }
+.bg-gray-100 { background-color: var(--muted); }
+.bg-gray-200 { background-color: var(--border); }
+.bg-gray-900 { background-color: #0f172a; }
+
+.text-white { color: var(--card); }
+.text-gray-900 { color: var(--foreground); }
+.text-gray-700 { color: var(--foreground); }
+.text-gray-600 { color: var(--muted-foreground); }
+.text-gray-500 { color: var(--muted-foreground); }
+.text-gray-400 { color: var(--muted-foreground); }
+.text-blue-600 { color: var(--primary); }
+
+.border { border-color: var(--border); }
+.border-b { border-color: var(--border); }
+
+.dark .bg-white { background-color: var(--card); }
+.dark .bg-gray-50 { background-color: var(--muted); }
+.dark .bg-gray-100 { background-color: var(--muted); }
+.dark .bg-gray-200 { background-color: var(--border); }
+.dark .bg-gray-900 { background-color: var(--background); }
+
+.dark .text-white { color: var(--foreground); }
+.dark .text-gray-900 { color: var(--card); }
+.dark .text-gray-700 { color: var(--card-foreground); }
+.dark .text-gray-600 { color: var(--muted-foreground); }
+.dark .text-gray-500 { color: var(--muted-foreground); }
+.dark .text-gray-400 { color: var(--muted-foreground); }
+.dark .text-blue-600 { color: var(--primary); }
+
+.dark .border { border-color: var(--border); }
+.dark .border-b { border-color: var(--border); }
