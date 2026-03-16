@@ -20,6 +20,20 @@ interface Media {
   created_at: string
 }
 
+// Helper to get preview image URL (watermarked, smaller)
+function getPreviewUrl(item: Media): string {
+  if (!item.file_path) return ''
+  
+  // If it's a backblaze path, use our preview API
+  if (item.file_path.startsWith('backblaze:')) {
+    const path = item.file_path.replace('backblaze:', '')
+    return `/api/preview?path=${encodeURIComponent(path)}&width=600&watermark=true`
+  }
+  
+  // Otherwise use the direct path (for Supabase storage URLs)
+  return item.thumbnail_path || item.file_path
+}
+
 export default function BrowsePage() {
   const [media, setMedia] = useState<Media[]>([])
   const [loading, setLoading] = useState(true)
@@ -171,9 +185,9 @@ export default function BrowsePage() {
             {media.map((item) => (
               <div key={item.id} className="border dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-900">
                 <div className="aspect-square bg-gray-200 dark:bg-gray-800 relative">
-                  {item.thumbnail_path ? (
+                  {getPreviewUrl(item) ? (
                     <img 
-                      src={item.thumbnail_path} 
+                      src={getPreviewUrl(item)} 
                       alt={item.filename}
                       className="w-full h-full object-cover"
                     />

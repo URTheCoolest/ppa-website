@@ -70,7 +70,17 @@ export default function MyRequestsPage() {
     setLoading(false)
   }
 
-  // Helper to get download URL
+  // Helper to get thumbnail/preview URL (watermarked)
+  const getThumbnailUrl = (request: LicenseRequest): string => {
+    if (!request.media?.file_path) return ''
+    if (request.media.file_path.startsWith('backblaze:')) {
+      const path = request.media.file_path.replace('backblaze:', '')
+      return `/api/preview?path=${encodeURIComponent(path)}&width=200&watermark=true`
+    }
+    return request.media.thumbnail_path || request.media.file_path || ''
+  }
+
+  // Helper to get download URL (raw, for approved licenses)
   const getDownloadUrl = (request: LicenseRequest): string => {
     if (!request.media?.file_path) return '#'
     if (request.media.file_path.startsWith('backblaze:')) {
@@ -155,10 +165,10 @@ export default function MyRequestsPage() {
                 <div className="flex gap-4">
                   {/* Thumbnail */}
                   <div className="w-24 h-24 bg-gray-200 dark:bg-gray-800 rounded-lg overflow-hidden flex-shrink-0">
-                    {request.media?.thumbnail_path ? (
+                    {getThumbnailUrl(request) ? (
                       <img
-                        src={request.media.thumbnail_path}
-                        alt={request.media.filename}
+                        src={getThumbnailUrl(request)}
+                        alt={request.media?.filename}
                         className="w-full h-full object-cover"
                       />
                     ) : (

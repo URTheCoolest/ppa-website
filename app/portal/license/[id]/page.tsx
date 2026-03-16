@@ -19,14 +19,24 @@ interface Media {
   photographer_id: string
 }
 
-// Helper to get image URL
-function getMediaUrl(item: Media): string {
+// Helper to get image URL for preview (watermarked, smaller)
+function getPreviewUrl(item: Media): string {
+  if (!item.file_path) return ''
+  if (item.file_path.startsWith('backblaze:')) {
+    const path = item.file_path.replace('backblaze:', '')
+    return `/api/preview?path=${encodeURIComponent(path)}&width=800&watermark=true`
+  }
+  return item.file_path || item.thumbnail_path || ''
+}
+
+// Helper to get raw download URL (for after purchase)
+function getDownloadUrl(item: Media): string {
   if (!item.file_path) return ''
   if (item.file_path.startsWith('backblaze:')) {
     const path = item.file_path.replace('backblaze:', '')
     return `/api/download?path=${encodeURIComponent(path)}`
   }
-  return item.file_path || item.thumbnail_path || ''
+  return item.file_path || ''
 }
 
 const USAGE_TYPES = [
@@ -225,7 +235,7 @@ export default function LicenseRequestPage() {
             <div className="border dark:border-gray-700 rounded-lg overflow-hidden">
               <div className="aspect-square bg-gray-200 dark:bg-gray-800 relative">
                 {(() => {
-                  const imgUrl = getMediaUrl(media)
+                  const imgUrl = getPreviewUrl(media)
                   return imgUrl ? (
                     <img 
                       src={imgUrl} 
