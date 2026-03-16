@@ -1,10 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 
 // Backblaze B2 Configuration  
 const B2_KEY_ID = process.env.BACKBLAZE_KEY_ID || '00329dfb0600d150000000001'
 const B2_APP_KEY = process.env.BACKBLAZE_APP_KEY || 'K003QYkZaYvX9VJxFv+Ee8EwKEC+EJc'
 const B2_BUCKET_NAME = process.env.BACKBLAZE_BUCKET_NAME || 'ppa-media'
 const B2_BUCKET_ID = process.env.BACKBLAZE_BUCKET_ID || '1259bd4fab80f67090cd0115'
+
+// Try to load watermark logo
+let watermarkBuffer: Buffer | null = null
+try {
+  watermarkBuffer = readFileSync(join(process.cwd(), 'public', 'watermark-logo.png'))
+} catch (e) {
+  console.log('No watermark logo found, using text watermark')
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -67,6 +77,11 @@ export async function GET(req: NextRequest) {
     let image = sharp(originalBuffer)
     const resizeWidth = parseInt(width)
     
+    // Get image metadata to calculate watermark size
+    const metadata = await image.metadata()
+    const origWidth = metadata.width || resizeWidth
+    const origHeight = metadata.height || resizeWidth
+    
     // Resize to max width while maintaining aspect ratio
     image = image.resize(resizeWidth, null, { 
       fit: 'inside',
@@ -74,32 +89,44 @@ export async function GET(req: NextRequest) {
     })
 
     // Add watermark if requested
-    if (watermark && contentType.startsWith('image/')) {
-      // Create watermark text as SVG
-      const watermarkText = 'PPA - PREVIEW ONLY'
-      const svgWatermark = `
-        <svg width="${resizeWidth}" height="100">
-          <style>
-            .watermark {
-              fill: rgba(255, 255, 255, 0.5);
-              font-size: 40px;
-              font-weight: bold;
-              text-anchor: middle;
-            }
-          </style>
-          <rect width="100%" height="100%" fill="rgba(0,0,0,0.3)"/>
-          <text x="50%" y="50%" class="watermark">${watermarkText}</text>
-        </svg>
-      `
+    if (watermark && contentType.startsWith('image/') && watermarkBuffer) {
+      // Resize watermark to be ~30% of image width
+      const watermarkWidth = Math.min(Math.floor(origWidth * 0.3), 300)
+      const wmBuffer = await sharp(watermarkBuffer)
+        .resize(watermarkWidth, null, { fit: 'inside' })
+        .ensureAlpha()
+        .toBuffer()
       
-      const watermarkBuffer = Buffer.from(svgWatermark)
+      // Get resized image dimensions
+      const resizedMeta = await image.metadata()
+      const imgWidth = resizedMeta.width || resizeWidth
+      const imgHeight = resizedMeta.height || resizeWidth
       
-      image = image
-        .composite([{
-          input: watermarkBuffer,
-          top: 0,
-          left: 0
+      // Calculate positions for tiled watermark (3x3 grid)
+      const positions: {top: number, left: number}[] = []
+      const spacingX = Math.floor(imgWidth / 3)
+      const spacingY = Math.floor(imgHeight / 3)
+      
+      for (let row = 0; row < 3; row++) {
+        for (let col = 0; col < 3; col++) {
+          positions.push({
+            top: row * spacingY + Math.floor(spacingY / 2),
+            left: col * spacingX + Math.floor(spacingX / 2)
+          })
+        }
+      }
+      
+      // Apply watermark at multiple positions with reduced opacity
+      let result = image
+      for (const pos of positions) {
+        result = result.composite([{
+          input: wmBuffer,
+          top: pos.top,
+          left: pos.left,
+          blend: 'over'
         }])
+        image = result
+      }
     }
 
     // Get output as buffer
