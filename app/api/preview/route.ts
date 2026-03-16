@@ -145,9 +145,9 @@ export async function GET(req: NextRequest) {
         const rotW = rotatedMeta.width || logoW
         const rotH = rotatedMeta.height || logoH
         
-        // Calculate spacing for diagonal pattern
-        const spacingX = Math.floor(rotW * 1.2)
-        const spacingY = Math.floor(rotH * 1.2)
+        // Calculate spacing for diagonal pattern (larger spacing for rows)
+        const spacingX = Math.floor(rotW * 1.0)
+        const spacingY = Math.floor(rotH * 2.0)
         const tilesX = Math.ceil(finalWidth / spacingX) + 2
         const tilesY = Math.ceil(finalHeight / spacingY) + 2
         
