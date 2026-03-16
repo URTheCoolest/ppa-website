@@ -17,23 +17,19 @@ export async function GET(req: NextRequest) {
 
     console.log('Download request for path:', path)
 
-    // Check if Backblaze env vars are configured
     if (!B2_KEY_ID || !B2_APP_KEY || !B2_BUCKET_NAME || !B2_BUCKET_ID) {
-      console.error('Missing Backblaze configuration')
       return NextResponse.json({ error: 'Download service not configured' }, { status: 500 })
     }
 
-    // Import Backblaze
     const B2 = require('backblaze-b2')
     const b2 = new B2({
       applicationKeyId: B2_KEY_ID,
       applicationKey: B2_APP_KEY
     })
 
-    // Authorize
     await b2.authorize()
 
-    // Find the file by name to get its fileId
+    // Get file by name to find the file ID
     const listResponse = await b2.listFileNames({
       bucketId: B2_BUCKET_ID,
       prefix: path,
@@ -44,30 +40,38 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'File not found in bucket' }, { status: 404 })
     }
 
-    const fileId = listResponse.data.files[0].fileId
-    console.log('Found file ID:', fileId)
+    const fileInfo = listResponse.data.files[0]
+    const fileId = fileInfo.fileId
+    const contentType = fileInfo.contentType
+    const filename = path.split('/').pop() || 'download'
 
-    // Use b2_download_file_by_id endpoint directly - this returns the file content
-    // We need to stream it through
+    console.log('Getting file:', fileId, contentType)
+
+    // Download the file using downloadFileById with responseType: 'stream'
     const downloadResponse = await b2.downloadFileById({
-      fileId: fileId
+      fileId: fileId,
+      responseType: 'stream'
     })
 
-    // Get the data from the response
-    const fileData = downloadResponse.data
+    // Get the stream from the response
+    const stream = downloadResponse.data
+
+    // Create a readable stream from the data
+    const chunks: Buffer[] = []
     
-    // Get content type from response headers or default to octet-stream
-    const contentType = downloadResponse.headers?.['content-type'] || 'application/octet-stream'
-    const contentLength = downloadResponse.headers?.['content-length']
+    // Convert stream to buffer
+    for await (const chunk of stream) {
+      chunks.push(Buffer.from(chunk))
+    }
+    
+    const buffer = Buffer.concat(chunks)
+    console.log('Downloaded size:', buffer.length)
 
-    console.log('Got file data, size:', contentLength)
-
-    // Return the file with proper headers
-    return new NextResponse(fileData, {
+    return new NextResponse(buffer, {
       headers: {
-        'Content-Type': contentType,
-        'Content-Disposition': `attachment; filename="${path.split('/').pop()}"`,
-        'Content-Length': contentLength || fileData.length
+        'Content-Type': contentType || 'application/octet-stream',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Length': buffer.length.toString()
       }
     })
 
