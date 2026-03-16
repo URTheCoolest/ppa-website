@@ -92,10 +92,10 @@ export async function GET(req: NextRequest) {
     
     // Add watermark if requested
     if (watermark && contentType.startsWith('image/') && watermarkBuffer) {
-      console.log('Adding diagonal tiled watermark...')
+      console.log('Adding watermark logo...')
       
-      // Resize watermark logo to be 20% of image width
-      const watermarkWidth = Math.floor(finalWidth * 0.2)
+      // Resize watermark logo to be 50% of image width
+      const watermarkWidth = Math.floor(finalWidth * 0.5)
       
       // Resize the logo
       const resizedWmBuffer = await sharp(watermarkBuffer)
@@ -103,39 +103,29 @@ export async function GET(req: NextRequest) {
           fit: 'inside',
           withoutEnlargEMENT: true 
         })
-        .ensureAlpha(0.3) // 30% opacity
+        .ensureAlpha(0.5) // 50% opacity
         .toBuffer()
       
       const wmMeta = await sharp(resizedWmBuffer).metadata()
       const wmWidth = wmMeta.width || watermarkWidth
       const wmHeight = wmMeta.height || Math.floor(watermarkWidth * 0.7)
       
-      console.log('Logo size:', wmWidth, 'x', wmHeight)
+      console.log('Logo size:', wmWidth, 'x', wmHeight, 'on image:', finalWidth, 'x', finalHeight)
       
-      // Start building the image with resize
+      // Calculate center position
+      const left = Math.floor((finalWidth - wmWidth) / 2)
+      const top = Math.floor((finalHeight - wmHeight) / 2)
+      
+      console.log('Logo position:', left, ',', top)
+      
+      // Build image with logo in center
       let image = sharp(originalBuffer).resize(finalWidth, finalHeight, { fit: 'fill' })
       
-      // Add diagonal tiled watermarks by compositing multiple times
-      // Calculate tile spacing
-      const tileSpacing = Math.max(wmWidth, wmHeight) * 2
-      
-      // First pass: create tiled pattern
-      for (let row = -1; row < Math.ceil(finalHeight / tileSpacing) + 1; row++) {
-        for (let col = -1; col < Math.ceil(finalWidth / tileSpacing) + 1; col++) {
-          const offsetX = (row % 2) * Math.floor(tileSpacing / 2)
-          let x = col * tileSpacing + offsetX - Math.floor(wmWidth / 2)
-          let y = row * tileSpacing - Math.floor(wmHeight / 2)
-          
-          // Only composite if visible
-          if (x + wmWidth > 0 && x < finalWidth && y + wmHeight > 0 && y < finalHeight) {
-            image = image.composite([{
-              input: resizedWmBuffer,
-              top: Math.max(0, y),
-              left: Math.max(0, x)
-            }])
-          }
-        }
-      }
+      image = image.composite([{
+        input: resizedWmBuffer,
+        top: top,
+        left: left
+      }])
       
       const outputBuffer = await image.toBuffer()
       const outputContentType = contentType || 'image/jpeg'
