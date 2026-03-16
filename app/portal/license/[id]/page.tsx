@@ -34,7 +34,7 @@ function getPreviewUrl(item: Media): string {
     path = path.split('/media/')[1]
   }
   
-  return `/api/preview?path=${encodeURIComponent(path)}&width=800&watermark=true&style=tiled`
+  return `/api/preview?path=${encodeURIComponent(path)}&width=800&watermark=true&style=diagonal`
 }
 
 // Helper to get raw download URL (for after purchase)

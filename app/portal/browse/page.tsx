@@ -38,7 +38,7 @@ function getPreviewUrl(item: Media): string {
   }
   
   // Use our preview API
-  return `/api/preview?path=${encodeURIComponent(path)}&width=600&watermark=true&style=tiled`
+  return `/api/preview?path=${encodeURIComponent(path)}&width=600&watermark=true&style=diagonal`
 }
 
 export default function BrowsePage() {
