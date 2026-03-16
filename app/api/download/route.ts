@@ -40,13 +40,21 @@ export async function GET(req: NextRequest) {
 
     // Get download authorization for this specific file
     const folderPrefix = path.substring(0, path.lastIndexOf('/') + 1)
-    console.log('Getting auth for prefix:', folderPrefix)
     
     const authResponse = await b2.getDownloadAuthorization({
       bucketId: B2_BUCKET_ID,
       fileNamePrefix: folderPrefix,
       validDurationInSeconds: 3600
     })
+
+    const { authorizationToken } = authResponse.data
+    
+    // Try using the download.backblazeb2.com domain which is the correct one
+    const downloadUrl = `https://download.backblazeb2.com/file/${B2_BUCKET_NAME}/${path}?Authorization=${authorizationToken}`
+    
+    console.log('Redirecting to download.backblazeb2.com')
+
+    return NextResponse.redirect(downloadUrl)
 
     const { authorizationToken } = authResponse.data
     
