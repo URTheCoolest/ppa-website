@@ -167,21 +167,11 @@ export default function MediaPage() {
           <div className="text-center py-12 dark:text-white">No media found</div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {filteredMedia.map(item => {
-              // Get image URL - handle different storage types
-              const getImageUrl = () => {
-                if (item.file_path?.startsWith('backblaze:')) {
-                  const path = item.file_path.replace('backblaze:', '')
-                  return `/api/download?path=${encodeURIComponent(path)}`
-                }
-                return item.file_path || item.thumbnail_path
-              }
-              
-              return (
+            {filteredMedia.map(item => (
               <div key={item.id} className="border dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800">
                 <div className="aspect-square bg-gray-200 dark:bg-gray-700 relative">
-                  {getImageUrl() ? (
-                    <img src={getImageUrl()} alt={item.filename} className="w-full h-full object-cover" />
+                  {item.thumbnail_path ? (
+                    <img src={item.thumbnail_path} alt={item.filename} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-4xl">
                       {item.media_type === 'photo' ? '📷' : '🎬'}
