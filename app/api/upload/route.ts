@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 const B2_KEY_ID = process.env.BACKBLAZE_KEY_ID!
 const B2_APP_KEY = process.env.BACKBLAZE_APP_KEY!
 const B2_BUCKET_ID = process.env.BACKBLAZE_BUCKET_ID!
+const B2_BUCKET_NAME = process.env.BACKBLAZE_BUCKET_NAME!
 
 export async function POST(req: NextRequest) {
   try {
@@ -47,7 +48,7 @@ export async function POST(req: NextRequest) {
     const fileExt = file.name.split('.').pop()
     const b2FileName = `${photographerId}/${folderId}/${mediaId}.${fileExt}`
 
-    const uploadResult = await b2.uploadFile({
+    await b2.uploadFile({
       uploadUrl: uploadUrl,
       uploadAuthToken: authorizationToken,
       fileName: b2FileName,
@@ -55,8 +56,14 @@ export async function POST(req: NextRequest) {
       contentType: file.type
     })
 
-    // Get the download URL
-    const downloadUrl = `https://s3.eu-central-003.backblazeb2.com/ppa-media/${b2FileName}`
+    // Generate a signed URL that expires in 24 hours
+    const signedUrlResponse = await b2.getDownloadSignedUrl({
+      bucketName: B2_BUCKET_NAME,
+      fileName: b2FileName,
+      validDurationInSeconds: 86400 // 24 hours
+    })
+
+    const downloadUrl = signedUrlResponse.data.url
 
     // Determine media type
     const mediaType = file.type.startsWith('video') ? 'video' : 'photo'
