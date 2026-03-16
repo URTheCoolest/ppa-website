@@ -71,34 +71,31 @@ export async function GET(req: NextRequest) {
     const originalBuffer = Buffer.concat(chunks)
 
     const sharp = require('sharp')
-    
-    let image = sharp(originalBuffer)
     const resizeWidth = parseInt(width)
     
-    // Get image metadata first
+    // First, get the original metadata
     const metadata = await sharp(originalBuffer).metadata()
     const origWidth = metadata.width || resizeWidth
     const origHeight = metadata.height || resizeWidth
     
-    // Resize image
-    image = sharp(originalBuffer).resize(resizeWidth, null, { 
-      fit: 'inside',
-      withoutEnlargement: true 
-    })
+    // Calculate the final dimensions after resize
+    const aspectRatio = origWidth / origHeight
+    let finalWidth = resizeWidth
+    let finalHeight = Math.floor(resizeWidth / aspectRatio)
+    
+    if (origWidth <= resizeWidth) {
+      finalWidth = origWidth
+      finalHeight = origHeight
+    }
+    
+    console.log('Final dimensions:', finalWidth, 'x', finalHeight)
     
     // Add watermark if requested
     if (watermark && contentType.startsWith('image/') && watermarkBuffer) {
-      console.log('Adding watermark to image...')
-      
-      // Get resized image dimensions
-      const resizedMeta = await image.clone().metadata()
-      const imgWidth = resizedMeta.width || resizeWidth
-      const imgHeight = resizedMeta.height || resizeWidth
-      
-      console.log('Image after resize:', imgWidth, 'x', imgHeight)
+      console.log('Adding watermark...')
       
       // Resize watermark to be 40% of image width
-      const watermarkWidth = Math.floor(imgWidth * 0.4)
+      const watermarkWidth = Math.floor(finalWidth * 0.4)
       
       const wmBuffer = await sharp(watermarkBuffer)
         .resize(watermarkWidth, null, { 
@@ -113,8 +110,8 @@ export async function GET(req: NextRequest) {
       const wmHeight = wmMeta.height || Math.floor(watermarkWidth * 0.7)
       
       // Calculate center position
-      const left = Math.floor((imgWidth - wmWidth) / 2)
-      const top = Math.floor((imgHeight - wmHeight) / 2)
+      const left = Math.floor((finalWidth - wmWidth) / 2)
+      const top = Math.floor((finalHeight - wmHeight) / 2)
       
       console.log('Watermark:', wmWidth, 'x', wmHeight, 'at:', left, ',', top)
       
@@ -125,32 +122,50 @@ export async function GET(req: NextRequest) {
         </svg>
       `)
       
-      // Composite overlay then watermark
-      image = image.composite([{
-        input: overlaySvg,
-        top: top,
-        left: left
-      }])
+      // Build the full pipeline: resize -> overlay -> watermark
+      let image = sharp(originalBuffer)
+        .resize(finalWidth, finalHeight, { 
+          fit: 'fill'
+        })
+        .composite([{
+          input: overlaySvg,
+          top: top,
+          left: left
+        }])
+        .composite([{
+          input: wmBuffer,
+          top: top,
+          left: left
+        }])
       
-      image = image.composite([{
-        input: wmBuffer,
-        top: top,
-        left: left
-      }])
+      const outputBuffer = await image.toBuffer()
+      const outputContentType = contentType || 'image/jpeg'
+
+      return new NextResponse(outputBuffer, {
+        headers: {
+          'Content-Type': outputContentType,
+          'Content-Length': outputBuffer.length.toString(),
+          'Cache-Control': 'public, max-age=3600'
+        }
+      })
+    } else {
+      // No watermark - just resize
+      let image = sharp(originalBuffer)
+        .resize(finalWidth, finalHeight, { 
+          fit: 'fill'
+        })
       
-      console.log('Watermark added!')
+      const outputBuffer = await image.toBuffer()
+      const outputContentType = contentType || 'image/jpeg'
+
+      return new NextResponse(outputBuffer, {
+        headers: {
+          'Content-Type': outputContentType,
+          'Content-Length': outputBuffer.length.toString(),
+          'Cache-Control': 'public, max-age=3600'
+        }
+      })
     }
-
-    const outputBuffer = await image.toBuffer()
-    const outputContentType = contentType || 'image/jpeg'
-
-    return new NextResponse(outputBuffer, {
-      headers: {
-        'Content-Type': outputContentType,
-        'Content-Length': outputBuffer.length.toString(),
-        'Cache-Control': 'public, max-age=3600'
-      }
-    })
 
   } catch (error: any) {
     console.error('Preview error:', error)
