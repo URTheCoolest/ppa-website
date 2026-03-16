@@ -38,29 +38,29 @@ export async function GET(req: NextRequest) {
     // Authorize
     await b2.authorize()
 
-    // Try to find the file by name and get its ID
+    // Get the file info using listFileNames
     const listResponse = await b2.listFileNames({
       bucketId: B2_BUCKET_ID,
       prefix: path,
       maxFileCount: 1
     })
 
-    console.log('List response:', listResponse.data.files)
+    console.log('Files found:', JSON.stringify(listResponse.data))
 
     if (!listResponse.data.files || listResponse.data.files.length === 0) {
       return NextResponse.json({ error: 'File not found in bucket' }, { status: 404 })
     }
 
-    const fileId = listResponse.data.files[0].fileId
+    const fileInfo = listResponse.data.files[0]
+    const fileId = fileInfo.fileId
 
-    // Get download URL for this specific file
-    const downloadResponse = await b2.getDownloadFileUrl({
-      fileId: fileId
-    })
+    // Build a direct download URL using the file ID
+    // This URL format works with Backblaze's download endpoint
+    const downloadUrl = `${b2.downloadUrl}/file/${B2_BUCKET_NAME}/${path}?download=1`
 
-    const downloadUrl = downloadResponse.data
-    console.log('Got download URL')
+    console.log('Direct download URL:', downloadUrl)
 
+    // For now, return the URL so we can see what we're getting
     return NextResponse.redirect(downloadUrl)
 
   } catch (error: any) {
