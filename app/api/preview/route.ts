@@ -23,6 +23,7 @@ export async function GET(req: NextRequest) {
     const path = searchParams.get('path')
     const width = searchParams.get('width') || '800'
     const watermark = searchParams.get('watermark') !== 'false'
+    const watermarkStyle = searchParams.get('style') || 'centered' // centered, tiled, diagonal
 
     if (!path) {
       return NextResponse.json({ error: 'No path provided' }, { status: 400 })
@@ -93,11 +94,14 @@ export async function GET(req: NextRequest) {
     // Add watermark if requested
     if (watermark && contentType.startsWith('image/') && watermarkBuffer) {
       console.log('=== WATERMARK PROCESSING ===')
+      console.log('Watermark style:', watermarkStyle)
       console.log('Logo buffer size:', watermarkBuffer.length)
       console.log('Final image size:', finalWidth, 'x', finalHeight)
       
-      // Resize logo to 40% of image width
-      const wmWidth = Math.floor(finalWidth * 0.4)
+      // Resize logo to 15% of image width for tiling (larger for centered)
+      const wmWidth = watermarkStyle === 'centered' 
+        ? Math.floor(finalWidth * 0.4) 
+        : Math.floor(finalWidth * 0.15)
       console.log('Target logo width:', wmWidth)
       
       const logoResized = await sharp(watermarkBuffer)
@@ -106,24 +110,100 @@ export async function GET(req: NextRequest) {
       console.log('Resized logo:', logoResized.length)
       
       // Get actual size
-      const meta = await sharp(logoResized).metadata()
-      console.log('Logo actual:', meta.width, 'x', meta.height)
+      const logoMeta = await sharp(logoResized).metadata()
+      const logoW = logoMeta.width || wmWidth
+      const logoH = logoMeta.height || wmWidth
+      console.log('Logo actual:', logoW, 'x', logoH)
       
-      // Create dark background box
-      const bgWidth = (meta.width || wmWidth) + 40
-      const bgHeight = (meta.height || wmWidth) + 40
-      const centerX = Math.floor((finalWidth - bgWidth) / 2)
-      const centerY = Math.floor((finalHeight - bgHeight) / 2)
+      let img: sharp.Sharp
       
-      console.log('Background:', bgWidth, 'x', bgHeight, 'at', centerX, ',', centerY)
-      
-      const bgSvg = Buffer.from(`<svg width="${bgWidth}" height="${bgHeight}"><rect width="100%" height="100%" fill="black" opacity="0.7"/></svg>`)
-      
-      // Composite
-      let img = sharp(originalBuffer)
-        .resize(finalWidth, finalHeight, { fit: 'fill' })
-        .composite([{ input: bgSvg, top: centerY, left: centerX }])
-        .composite([{ input: logoResized, top: centerY + 20, left: centerX + 20 }])
+      if (watermarkStyle === 'centered') {
+        // Create dark background box for centered
+        const bgWidth = logoW + 40
+        const bgHeight = logoH + 40
+        const centerX = Math.floor((finalWidth - bgWidth) / 2)
+        const centerY = Math.floor((finalHeight - bgHeight) / 2)
+        
+        console.log('Background:', bgWidth, 'x', bgHeight, 'at', centerX, ',', centerY)
+        
+        const bgSvg = Buffer.from(`<svg width="${bgWidth}" height="${bgHeight}"><rect width="100%" height="100%" fill="black" opacity="0.7"/></svg>`)
+        
+        img = sharp(originalBuffer)
+          .resize(finalWidth, finalHeight, { fit: 'fill' })
+          .composite([{ input: bgSvg, top: centerY, left: centerX }])
+          .composite([{ input: logoResized, top: centerY + 20, left: centerX + 20 }])
+      } else if (watermarkStyle === 'diagonal') {
+        // Diagonal watermark - rotated tiles across image
+        console.log('Creating diagonal watermark...')
+        
+        // Rotate logo 45 degrees for diagonal pattern
+        const logoRotated = await sharp(logoResized)
+          .rotate(45, { background: { r: 0, g: 0, b: 0, alpha: 0 } })
+          .toBuffer()
+        
+        const rotatedMeta = await sharp(logoRotated).metadata()
+        const rotW = rotatedMeta.width || logoW
+        const rotH = rotatedMeta.height || logoH
+        
+        // Calculate spacing for diagonal pattern
+        const spacingX = Math.floor(rotW * 1.2)
+        const spacingY = Math.floor(rotH * 1.2)
+        const tilesX = Math.ceil(finalWidth / spacingX) + 2
+        const tilesY = Math.ceil(finalHeight / spacingY) + 2
+        
+        console.log('Rotated logo:', rotW, 'x', rotH)
+        console.log('Tiles:', tilesX, 'x', tilesY)
+        
+        const composites: sharp.OverlayOptions[] = []
+        
+        for (let y = -1; y < tilesY; y++) {
+          for (let x = -1; x < tilesX; x++) {
+            // Offset every other row for diagonal effect
+            const offsetX = (y % 2) * Math.floor(spacingX / 2)
+            composites.push({
+              input: logoRotated,
+              top: y * spacingY + offsetX,
+              left: x * spacingX
+            })
+          }
+        }
+        
+        console.log('Total diagonal composites:', composites.length)
+        
+        img = sharp(originalBuffer)
+          .resize(finalWidth, finalHeight, { fit: 'fill' })
+          .composite(composites)
+      } else {
+        // Tiled watermark - repeat across entire image
+        console.log('Creating tiled watermark...')
+        
+        // Calculate how many tiles needed
+        const spacingX = Math.floor(logoW * 1.5)
+        const spacingY = Math.floor(logoH * 1.5)
+        const tilesX = Math.ceil(finalWidth / spacingX) + 1
+        const tilesY = Math.ceil(finalHeight / spacingY) + 1
+        
+        console.log('Tiles:', tilesX, 'x', tilesY, 'spacing:', spacingX, ',', spacingY)
+        
+        // Build composite operations array
+        const composites: sharp.OverlayOptions[] = []
+        
+        for (let y = 0; y < tilesY; y++) {
+          for (let x = 0; x < tilesX; x++) {
+            composites.push({
+              input: logoResized,
+              top: y * spacingY,
+              left: x * spacingX
+            })
+          }
+        }
+        
+        console.log('Total composites:', composites.length)
+        
+        img = sharp(originalBuffer)
+          .resize(finalWidth, finalHeight, { fit: 'fill' })
+          .composite(composites)
+      }
       
       const result = await img.toBuffer()
       console.log('Result size:', result.length)
