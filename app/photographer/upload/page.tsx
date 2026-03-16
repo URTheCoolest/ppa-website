@@ -180,12 +180,12 @@ export default function UploadPage() {
         const formData = new FormData()
         formData.append('file', mediaFile.file)
         formData.append('photographerId', user.id)
-        formData.append('folderId', folderIdToUse)
+        formData.append('folderId', folderIdToUse || '')
         formData.append('mediaId', mediaId)
-        formData.append('filename', mediaFile.filename)
-        formData.append('description', mediaFile.description)
-        formData.append('shooting_date', mediaFile.shooting_date)
-        formData.append('category', mediaFile.category)
+        formData.append('filename', mediaFile.filename || '')
+        formData.append('description', mediaFile.description || '')
+        formData.append('shooting_date', mediaFile.shooting_date || '')
+        formData.append('category', mediaFile.category || '')
 
         const uploadResponse = await fetch('/api/upload', {
           method: 'POST',
