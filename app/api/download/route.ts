@@ -33,23 +33,43 @@ export async function GET(req: NextRequest) {
     // Authorize
     await b2.authorize()
 
-    // Get download authorization for the folder containing this file
-    const folderPrefix = path.substring(0, path.lastIndexOf('/') + 1)
-    
-    const authResponse = await b2.getDownloadAuthorization({
+    // Find the file by name to get its fileId
+    const listResponse = await b2.listFileNames({
       bucketId: B2_BUCKET_ID,
-      fileNamePrefix: folderPrefix,
-      validDurationInSeconds: 3600
+      prefix: path,
+      maxFileCount: 1
     })
 
-    const { authorizationToken } = authResponse.data
-    
-    // Use download.backblazeb2.com for authorized downloads
-    const downloadUrl = `https://download.backblazeb2.com/file/${B2_BUCKET_NAME}/${path}?Authorization=${authorizationToken}`
-    
-    console.log('Redirecting to Backblaze')
+    if (!listResponse.data.files || listResponse.data.files.length === 0) {
+      return NextResponse.json({ error: 'File not found in bucket' }, { status: 404 })
+    }
 
-    return NextResponse.redirect(downloadUrl)
+    const fileId = listResponse.data.files[0].fileId
+    console.log('Found file ID:', fileId)
+
+    // Use b2_download_file_by_id endpoint directly - this returns the file content
+    // We need to stream it through
+    const downloadResponse = await b2.downloadFileById({
+      fileId: fileId
+    })
+
+    // Get the data from the response
+    const fileData = downloadResponse.data
+    
+    // Get content type from response headers or default to octet-stream
+    const contentType = downloadResponse.headers?.['content-type'] || 'application/octet-stream'
+    const contentLength = downloadResponse.headers?.['content-length']
+
+    console.log('Got file data, size:', contentLength)
+
+    // Return the file with proper headers
+    return new NextResponse(fileData, {
+      headers: {
+        'Content-Type': contentType,
+        'Content-Disposition': `attachment; filename="${path.split('/').pop()}"`,
+        'Content-Length': contentLength || fileData.length
+      }
+    })
 
   } catch (error: any) {
     console.error('Download error:', error)
