@@ -20,6 +20,7 @@ interface LicenseRequest {
     filename: string
     media_id: string
     media_type: string
+    file_path: string | null
     thumbnail_path: string | null
   }
 }
@@ -62,11 +63,21 @@ export default function MyRequestsPage() {
   const loadRequests = async () => {
     const { data, error } = await supabase
       .from('license_requests')
-      .select('*, media(filename, media_id, media_type, thumbnail_path)')
+      .select('*, media(filename, media_id, media_type, file_path, thumbnail_path)')
       .order('created_at', { ascending: false })
 
     if (data) setRequests(data)
     setLoading(false)
+  }
+
+  // Helper to get download URL
+  const getDownloadUrl = (request: LicenseRequest): string => {
+    if (!request.media?.file_path) return '#'
+    if (request.media.file_path.startsWith('backblaze:')) {
+      const path = request.media.file_path.replace('backblaze:', '')
+      return `/api/download?path=${encodeURIComponent(path)}`
+    }
+    return request.media.file_path
   }
 
   const getStatusColor = (status: string) => {
@@ -166,9 +177,21 @@ export default function MyRequestsPage() {
                           {request.media?.media_id} • {request.media?.media_type}
                         </p>
                       </div>
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(request.status)}`}>
-                        {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {request.status === 'approved' && (
+                          <a
+                            href={getDownloadUrl(request)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm font-medium flex items-center gap-1"
+                          >
+                            📥 Download
+                          </a>
+                        )}
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(request.status)}`}>
+                          {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                        </span>
+                      </div>
                     </div>
 
                     <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
