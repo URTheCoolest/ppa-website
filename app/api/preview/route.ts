@@ -92,10 +92,11 @@ export async function GET(req: NextRequest) {
     
     // Add watermark if requested
     if (watermark && contentType.startsWith('image/') && watermarkBuffer) {
-      console.log('Adding watermark logo...')
+      console.log('Adding watermark logo, buffer size:', watermarkBuffer.length)
       
       // Resize watermark logo to be 50% of image width
       const watermarkWidth = Math.floor(finalWidth * 0.5)
+      console.log('Watermark target width:', watermarkWidth)
       
       // Resize the logo
       const resizedWmBuffer = await sharp(watermarkBuffer)
@@ -103,20 +104,20 @@ export async function GET(req: NextRequest) {
           fit: 'inside',
           withoutEnlargEMENT: true 
         })
-        .ensureAlpha(0.5) // 50% opacity
+        .png() // Force PNG output
         .toBuffer()
       
       const wmMeta = await sharp(resizedWmBuffer).metadata()
       const wmWidth = wmMeta.width || watermarkWidth
       const wmHeight = wmMeta.height || Math.floor(watermarkWidth * 0.7)
       
-      console.log('Logo size:', wmWidth, 'x', wmHeight, 'on image:', finalWidth, 'x', finalHeight)
+      console.log('Logo resized to:', wmWidth, 'x', wmHeight)
       
       // Calculate center position
       const left = Math.floor((finalWidth - wmWidth) / 2)
       const top = Math.floor((finalHeight - wmHeight) / 2)
       
-      console.log('Logo position:', left, ',', top)
+      console.log('Compositing at position:', left, ',', top)
       
       // Build image with logo in center
       let image = sharp(originalBuffer).resize(finalWidth, finalHeight, { fit: 'fill' })
@@ -128,13 +129,15 @@ export async function GET(req: NextRequest) {
       }])
       
       const outputBuffer = await image.toBuffer()
-      const outputContentType = contentType || 'image/jpeg'
+      console.log('Output size:', outputBuffer.length)
+      
+      const outputContentType = 'image/png'
 
       return new NextResponse(outputBuffer, {
         headers: {
           'Content-Type': outputContentType,
           'Content-Length': outputBuffer.length.toString(),
-          'Cache-Control': 'public, max-age=3600'
+          'Cache-Control': 'no-cache, no-store, must-revalidate'
         }
       })
     } else {
