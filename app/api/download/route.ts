@@ -38,30 +38,26 @@ export async function GET(req: NextRequest) {
     // Authorize
     await b2.authorize()
 
-    // Get the file info using listFileNames
-    const listResponse = await b2.listFileNames({
+    // Get download authorization for this specific file
+    // The prefix must match the start of the filename
+    const folderPrefix = path.substring(0, path.lastIndexOf('/') + 1)
+    
+    const authResponse = await b2.getDownloadAuthorization({
       bucketId: B2_BUCKET_ID,
-      prefix: path,
-      maxFileCount: 1
+      fileNamePrefix: folderPrefix,
+      validDurationInSeconds: 3600
     })
 
-    console.log('Files found:', JSON.stringify(listResponse.data))
+    const { authorizationToken, token, downloadUrl: authDownloadUrl } = authResponse.data
+    
+    console.log('Got auth token')
 
-    if (!listResponse.data.files || listResponse.data.files.length === 0) {
-      return NextResponse.json({ error: 'File not found in bucket' }, { status: 404 })
-    }
+    // Use the authorized download URL with the token
+    const finalUrl = `${authDownloadUrl}/file/${B2_BUCKET_NAME}/${path}?Authorization=${authorizationToken}`
+    
+    console.log('Redirecting to authorized URL')
 
-    const fileInfo = listResponse.data.files[0]
-    const fileId = fileInfo.fileId
-
-    // Build a direct download URL using the file ID
-    // This URL format works with Backblaze's download endpoint
-    const downloadUrl = `${b2.downloadUrl}/file/${B2_BUCKET_NAME}/${path}?download=1`
-
-    console.log('Direct download URL:', downloadUrl)
-
-    // For now, return the URL so we can see what we're getting
-    return NextResponse.redirect(downloadUrl)
+    return NextResponse.redirect(finalUrl)
 
   } catch (error: any) {
     console.error('Download error:', error)
