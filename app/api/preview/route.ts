@@ -133,19 +133,24 @@ export async function GET(req: NextRequest) {
           .composite([{ input: bgSvg, top: centerY, left: centerX }])
           .composite([{ input: logoResized, top: centerY + 20, left: centerX + 20 }])
       } else if (watermarkStyle === 'diagonal') {
-        // Diagonal watermark - rotated tiles across image
+        // Diagonal watermark - TWO directions: 45° and -45° for crosshatch effect
         console.log('Creating diagonal watermark...')
         
-        // Rotate logo 45 degrees for diagonal pattern
+        // Rotate logo 45 degrees for first direction
         const logoRotated = await sharp(logoResized)
           .rotate(45, { background: { r: 0, g: 0, b: 0, alpha: 0 } })
+          .toBuffer()
+        
+        // Rotate logo -45 degrees (315°) for opposite direction
+        const logoRotatedOpposite = await sharp(logoResized)
+          .rotate(-45, { background: { r: 0, g: 0, b: 0, alpha: 0 } })
           .toBuffer()
         
         const rotatedMeta = await sharp(logoRotated).metadata()
         const rotW = rotatedMeta.width || logoW
         const rotH = rotatedMeta.height || logoH
         
-        // Calculate spacing for diagonal pattern (larger spacing for rows)
+        // Calculate spacing for diagonal pattern
         const spacingX = Math.floor(rotW * 1.0)
         const spacingY = Math.floor(rotH * 2.0)
         const tilesX = Math.ceil(finalWidth / spacingX) + 2
@@ -156,13 +161,26 @@ export async function GET(req: NextRequest) {
         
         const composites: any[] = []
         
+        // Direction 1: 45° (forward slash /)
         for (let y = -1; y < tilesY; y++) {
           for (let x = -1; x < tilesX; x++) {
-            // Offset every other row for diagonal effect
             const offsetX = (y % 2) * Math.floor(spacingX / 2)
             composites.push({
               input: logoRotated,
               top: y * spacingY + offsetX,
+              left: x * spacingX
+            })
+          }
+        }
+        
+        // Direction 2: -45° (backslash \) - offset down by half the row spacing
+        const rowOffset = Math.floor(spacingY * 0.5)
+        for (let y = -1; y < tilesY; y++) {
+          for (let x = -1; x < tilesX; x++) {
+            const offsetX = (y % 2) * Math.floor(spacingX / 2)
+            composites.push({
+              input: logoRotatedOpposite,
+              top: y * spacingY + rowOffset + offsetX,
               left: x * spacingX
             })
           }
