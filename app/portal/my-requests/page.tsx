@@ -84,7 +84,7 @@ export default function MyRequestsPage() {
       path = path.split('/media/')[1]
     }
     
-    return `/api/preview?path=${encodeURIComponent(path)}&width=200&watermark=true`
+    return `/api/preview?path=${encodeURIComponent(path)}&width=200&watermark=true&style=tiled`
   }
 
   // Helper to get download URL (raw, for approved licenses)
