@@ -92,46 +92,62 @@ export async function GET(req: NextRequest) {
     
     // Add watermark if requested
     if (watermark && contentType.startsWith('image/') && watermarkBuffer) {
-      console.log('Adding tiled watermark...')
+      console.log('Adding tiled watermark, logo buffer:', watermarkBuffer.length)
       
-      // Resize watermark logo to be 25% of image width
-      const watermarkWidth = Math.floor(finalWidth * 0.25)
+      // Resize watermark logo to be 30% of image width
+      const watermarkWidth = Math.floor(finalWidth * 0.3)
+      console.log('Target watermark width:', watermarkWidth)
       
-      // Resize the logo
-      const resizedWmBuffer = await sharp(watermarkBuffer)
-        .resize(watermarkWidth, null, { 
-          fit: 'inside',
-          withoutEnlargEMENT: true 
-        })
-        .ensureAlpha(0.5)
-        .png()
+      // First resize the logo
+      const logoBuffer = await sharp(watermarkBuffer)
+        .resize(watermarkWidth, null, { fit: 'inside' })
         .toBuffer()
+      console.log('Resized logo:', logoBuffer.length)
       
-      const wmMeta = await sharp(resizedWmBuffer).metadata()
+      // Get dimensions
+      const wmMeta = await sharp(logoBuffer).metadata()
       const wmWidth = wmMeta.width || watermarkWidth
       const wmHeight = wmMeta.height || Math.floor(watermarkWidth * 0.7)
       
-      console.log('Logo size:', wmWidth, 'x', wmHeight)
+      console.log('Logo dimensions:', wmWidth, 'x', wmHeight)
       
-      // Simple grid tiling
-      const spacingX = wmWidth + 50
-      const spacingY = wmHeight + 50
+      // Create tiles
+      const spacing = 200
+      const cols = Math.ceil(finalWidth / spacing) + 1
+      const rows = Math.ceil(finalHeight / spacing) + 1
       
-      // Build image
+      console.log('Creating', cols * rows, 'tiles')
+      
+      // Start with image
       let image = sharp(originalBuffer).resize(finalWidth, finalHeight, { fit: 'fill' })
       
-      // Add grid of logos
-      for (let y = 0; y < finalHeight + wmHeight; y += spacingY) {
-        for (let x = 0; x < finalWidth + wmWidth; x += spacingX) {
+      // Add logo tiles
+      let count = 0
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const y = r * spacing - Math.floor(wmHeight / 2)
+          const x = c * spacing - Math.floor(wmWidth / 2)
+          
+          // Add dark background then logo
           image = image.composite([{
-            input: resizedWmBuffer,
+            input: Buffer.from(`<svg width="${wmWidth}" height="${wmHeight}"><rect width="100%" height="100%" fill="black" opacity="0.5"/></svg>`),
             top: y,
             left: x
           }])
+          
+          image = image.composite([{
+            input: logoBuffer,
+            top: y,
+            left: x
+          }])
+          count++
         }
       }
       
+      console.log('Added', count, 'watermarks')
+      
       const outputBuffer = await image.toBuffer()
+      console.log('Output size:', outputBuffer.length)
 
       return new NextResponse(outputBuffer, {
         headers: {
