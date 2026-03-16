@@ -75,17 +75,17 @@ export async function GET(req: NextRequest) {
     let image = sharp(originalBuffer)
     const resizeWidth = parseInt(width)
     
-    // Get image metadata
-    const metadata = await image.metadata()
+    // Get image metadata first
+    const metadata = await sharp(originalBuffer).metadata()
     const origWidth = metadata.width || resizeWidth
     const origHeight = metadata.height || resizeWidth
     
-    // Resize to max width while maintaining aspect ratio
-    image = image.resize(resizeWidth, null, { 
+    // Resize image
+    image = sharp(originalBuffer).resize(resizeWidth, null, { 
       fit: 'inside',
       withoutEnlargement: true 
     })
-
+    
     // Add watermark if requested
     if (watermark && contentType.startsWith('image/') && watermarkBuffer) {
       console.log('Adding watermark to image...')
@@ -95,46 +95,47 @@ export async function GET(req: NextRequest) {
       const imgWidth = resizedMeta.width || resizeWidth
       const imgHeight = resizedMeta.height || resizeWidth
       
+      console.log('Image after resize:', imgWidth, 'x', imgHeight)
+      
       // Resize watermark to be 40% of image width
-      const watermarkWidth = Math.min(Math.floor(imgWidth * 0.4), 400)
+      const watermarkWidth = Math.floor(imgWidth * 0.4)
       
       const wmBuffer = await sharp(watermarkBuffer)
         .resize(watermarkWidth, null, { 
           fit: 'inside',
-          withoutEnlargement: true 
+          withoutEnlargEMENT: true 
         })
         .toBuffer()
       
-      // Get watermark dimensions after resize
+      // Get watermark dimensions
       const wmMeta = await sharp(wmBuffer).metadata()
       const wmWidth = wmMeta.width || watermarkWidth
-      const wmHeight = wmMeta.height || watermarkWidth
+      const wmHeight = wmMeta.height || Math.floor(watermarkWidth * 0.7)
       
       // Calculate center position
       const left = Math.floor((imgWidth - wmWidth) / 2)
       const top = Math.floor((imgHeight - wmHeight) / 2)
       
-      console.log('Image:', imgWidth, 'x', imgHeight, 'Watermark:', wmWidth, 'x', wmHeight)
+      console.log('Watermark:', wmWidth, 'x', wmHeight, 'at:', left, ',', top)
       
-      // Create a dark semi-transparent background for the watermark
+      // Create dark overlay
       const overlaySvg = Buffer.from(`
         <svg width="${wmWidth}" height="${wmHeight}">
-          <rect width="100%" height="100%" fill="black" opacity="0.5"/>
+          <rect width="100%" height="100%" fill="black" opacity="0.6"/>
         </svg>
       `)
       
-      // First composite the dark overlay
+      // Composite overlay then watermark
       image = image.composite([{
         input: overlaySvg,
-        top: Math.max(0, top),
-        left: Math.max(0, left)
+        top: top,
+        left: left
       }])
       
-      // Then composite the watermark on top
       image = image.composite([{
         input: wmBuffer,
-        top: Math.max(0, top),
-        left: Math.max(0, left)
+        top: top,
+        left: left
       }])
       
       console.log('Watermark added!')

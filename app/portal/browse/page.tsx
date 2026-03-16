@@ -24,14 +24,21 @@ interface Media {
 function getPreviewUrl(item: Media): string {
   if (!item.file_path) return ''
   
-  // If it's a backblaze path, use our preview API
-  if (item.file_path.startsWith('backblaze:')) {
-    const path = item.file_path.replace('backblaze:', '')
-    return `/api/preview?path=${encodeURIComponent(path)}&width=600&watermark=true`
+  let path = item.file_path
+  
+  // Extract path from different formats
+  if (path.startsWith('backblaze:')) {
+    path = path.replace('backblaze:', '')
+  } else if (path.includes('/ppa-media/')) {
+    // Extract from Backblaze S3 URL
+    path = path.split('/ppa-media/')[1]
+  } else if (path.includes('/media/')) {
+    // Extract from Supabase storage URL
+    path = path.split('/media/')[1]
   }
   
-  // Otherwise use the direct path (for Supabase storage URLs)
-  return item.thumbnail_path || item.file_path
+  // Use our preview API
+  return `/api/preview?path=${encodeURIComponent(path)}&width=600&watermark=true`
 }
 
 export default function BrowsePage() {

@@ -73,21 +73,35 @@ export default function MyRequestsPage() {
   // Helper to get thumbnail/preview URL (watermarked)
   const getThumbnailUrl = (request: LicenseRequest): string => {
     if (!request.media?.file_path) return ''
-    if (request.media.file_path.startsWith('backblaze:')) {
-      const path = request.media.file_path.replace('backblaze:', '')
-      return `/api/preview?path=${encodeURIComponent(path)}&width=200&watermark=true`
+    
+    let path = request.media.file_path
+    
+    if (path.startsWith('backblaze:')) {
+      path = path.replace('backblaze:', '')
+    } else if (path.includes('/ppa-media/')) {
+      path = path.split('/ppa-media/')[1]
+    } else if (path.includes('/media/')) {
+      path = path.split('/media/')[1]
     }
-    return request.media.thumbnail_path || request.media.file_path || ''
+    
+    return `/api/preview?path=${encodeURIComponent(path)}&width=200&watermark=true`
   }
 
   // Helper to get download URL (raw, for approved licenses)
   const getDownloadUrl = (request: LicenseRequest): string => {
     if (!request.media?.file_path) return '#'
-    if (request.media.file_path.startsWith('backblaze:')) {
-      const path = request.media.file_path.replace('backblaze:', '')
-      return `/api/download?path=${encodeURIComponent(path)}`
+    
+    let path = request.media.file_path
+    
+    if (path.startsWith('backblaze:')) {
+      path = path.replace('backblaze:', '')
+    } else if (path.includes('/ppa-media/')) {
+      path = path.split('/ppa-media/')[1]
+    } else if (path.includes('/media/')) {
+      path = path.split('/media/')[1]
     }
-    return request.media.file_path
+    
+    return `/api/download?path=${encodeURIComponent(path)}`
   }
 
   const getStatusColor = (status: string) => {

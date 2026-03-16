@@ -9,11 +9,18 @@ import ThemeToggle from '@/components/ThemeToggle'
 // Helper to get preview image URL (watermarked)
 function getPreviewUrl(item: any): string {
   if (!item.file_path) return ''
-  if (item.file_path.startsWith('backblaze:')) {
-    const path = item.file_path.replace('backblaze:', '')
-    return `/api/preview?path=${encodeURIComponent(path)}&width=400&watermark=true`
+  
+  let path = item.file_path
+  
+  if (path.startsWith('backblaze:')) {
+    path = path.replace('backblaze:', '')
+  } else if (path.includes('/ppa-media/')) {
+    path = path.split('/ppa-media/')[1]
+  } else if (path.includes('/media/')) {
+    path = path.split('/media/')[1]
   }
-  return item.thumbnail_path || item.file_path
+  
+  return `/api/preview?path=${encodeURIComponent(path)}&width=400&watermark=true`
 }
 
 export default function PhotographerPortal() {

@@ -22,21 +22,36 @@ interface Media {
 // Helper to get image URL for preview (watermarked, smaller)
 function getPreviewUrl(item: Media): string {
   if (!item.file_path) return ''
-  if (item.file_path.startsWith('backblaze:')) {
-    const path = item.file_path.replace('backblaze:', '')
-    return `/api/preview?path=${encodeURIComponent(path)}&width=800&watermark=true`
+  
+  let path = item.file_path
+  
+  // Extract path from different formats
+  if (path.startsWith('backblaze:')) {
+    path = path.replace('backblaze:', '')
+  } else if (path.includes('/ppa-media/')) {
+    path = path.split('/ppa-media/')[1]
+  } else if (path.includes('/media/')) {
+    path = path.split('/media/')[1]
   }
-  return item.file_path || item.thumbnail_path || ''
+  
+  return `/api/preview?path=${encodeURIComponent(path)}&width=800&watermark=true`
 }
 
 // Helper to get raw download URL (for after purchase)
 function getDownloadUrl(item: Media): string {
   if (!item.file_path) return ''
-  if (item.file_path.startsWith('backblaze:')) {
-    const path = item.file_path.replace('backblaze:', '')
-    return `/api/download?path=${encodeURIComponent(path)}`
+  
+  let path = item.file_path
+  
+  if (path.startsWith('backblaze:')) {
+    path = path.replace('backblaze:', '')
+  } else if (path.includes('/ppa-media/')) {
+    path = path.split('/ppa-media/')[1]
+  } else if (path.includes('/media/')) {
+    path = path.split('/media/')[1]
   }
-  return item.file_path || ''
+  
+  return `/api/download?path=${encodeURIComponent(path)}`
 }
 
 const USAGE_TYPES = [
