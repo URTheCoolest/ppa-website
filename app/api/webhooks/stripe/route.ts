@@ -12,9 +12,6 @@ export async function POST(req: NextRequest) {
     const body = await req.text()
     const signature = req.headers.get('stripe-signature')
 
-    console.log('Has signature:', !!signature)
-    console.log('Has webhook secret:', !!process.env.STRIPE_WEBHOOK_SECRET)
-
     let event: Stripe.Event
 
     if (!process.env.STRIPE_WEBHOOK_SECRET) {
@@ -43,19 +40,45 @@ export async function POST(req: NextRequest) {
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object as Stripe.Checkout.Session
       
-      const licenseRequestId = session.metadata?.licenseRequestId
+      let licenseRequestId = session.metadata?.licenseRequestId
       const clientId = session.metadata?.clientId
       const photographerId = session.metadata?.photographerId
       const amountPaid = session.amount_total ? session.amount_total / 100 : 0
 
-      console.log('Payment details:', { licenseRequestId, clientId, photographerId, amountPaid })
+      console.log('Payment details from metadata:', { licenseRequestId, clientId, photographerId, amountPaid })
+
+      // If no metadata, try to find the most recent pending license request for this client
+      if (!licenseRequestId && clientId) {
+        console.log('No metadata, searching for pending license request...')
+        
+        const { createClient } = require('@supabase/supabase-js')
+        const supabase = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!
+        )
+
+        // Find the most recent pending request for this client with matching amount
+        const { data: pendingRequests } = await supabase
+          .from('license_requests')
+          .select('*')
+          .eq('client_id', clientId)
+          .eq('status', 'pending')
+          .eq('price_pln', amountPaid)
+          .order('created_at', { ascending: false })
+          .limit(1)
+
+        if (pendingRequests && pendingRequests.length > 0) {
+          licenseRequestId = pendingRequests[0].id
+          console.log('Found pending request:', licenseRequestId)
+        }
+      }
 
       if (!licenseRequestId) {
-        console.error('No licenseRequestId in metadata!')
+        console.error('No license request ID found!')
         return NextResponse.json({ error: 'No license request ID' }, { status: 400 })
       }
 
-      // Import Supabase admin client here to ensure env vars are loaded
+      // Import Supabase admin client
       const { createClient } = require('@supabase/supabase-js')
       const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -72,10 +95,6 @@ export async function POST(req: NextRequest) {
         .eq('id', licenseRequestId)
 
       console.log('Update result:', updateError)
-
-      if (updateError) {
-        console.error('Update error:', updateError)
-      }
 
       // Record transaction
       const { error: insertError } = await supabase
