@@ -20,6 +20,16 @@ interface Media {
   created_at: string
 }
 
+// Helper to get image URL
+function getMediaUrl(item: Media): string {
+  if (!item.file_path) return ''
+  if (item.file_path.startsWith('backblaze:')) {
+    const path = item.file_path.replace('backblaze:', '')
+    return `/api/download?path=${encodeURIComponent(path)}`
+  }
+  return item.file_path || item.thumbnail_path || ''
+}
+
 export default function BrowsePage() {
   const [media, setMedia] = useState<Media[]>([])
   const [loading, setLoading] = useState(true)
@@ -168,12 +178,14 @@ export default function BrowsePage() {
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {media.map((item) => (
+            {media.map((item) => {
+              const imgUrl = getMediaUrl(item)
+              return (
               <div key={item.id} className="border dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-900">
                 <div className="aspect-square bg-gray-200 dark:bg-gray-800 relative">
-                  {item.thumbnail_path ? (
+                  {imgUrl ? (
                     <img 
-                      src={item.thumbnail_path} 
+                      src={imgUrl} 
                       alt={item.filename}
                       className="w-full h-full object-cover"
                     />
@@ -197,7 +209,7 @@ export default function BrowsePage() {
                   </Link>
                 </div>
               </div>
-            ))}
+            )}
           </div>
         )}
       </main>
