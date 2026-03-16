@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 // Backblaze B2 Configuration  
-const B2_KEY_ID = process.env.BACKBLAZE_KEY_ID
-const B2_APP_KEY = process.env.BACKBLAZE_APP_KEY
-const B2_BUCKET_NAME = process.env.BACKBLAZE_BUCKET_NAME
-const B2_BUCKET_ID = process.env.BACKBLAZE_BUCKET_ID
-const B2_DOWNLOAD_DOMAIN = process.env.BACKBLAZE_DOWNLOAD_DOMAIN
+const B2_KEY_ID = process.env.BACKBLAZE_KEY_ID || '00329dfb0600d150000000001'
+const B2_APP_KEY = process.env.BACKBLAZE_APP_KEY || 'K003QYkZaYvX9VJxFv+Ee8EwKEC+EJc'
+const B2_BUCKET_NAME = process.env.BACKBLAZE_BUCKET_NAME || 'ppa-media'
+const B2_BUCKET_ID = process.env.BACKBLAZE_BUCKET_ID || '1259bd4fab80f67090cd0115'
+const B2_DOWNLOAD_DOMAIN = process.env.BACKBLAZE_DOWNLOAD_DOMAIN || 's3.eu-central-003.backblazeb2.com'
 
 export async function GET(req: NextRequest) {
   try {
@@ -17,6 +17,7 @@ export async function GET(req: NextRequest) {
     }
 
     console.log('Download request for path:', path)
+    console.log('Using bucket ID:', B2_BUCKET_ID)
 
     // Check if Backblaze env vars are configured
     if (!B2_KEY_ID || !B2_APP_KEY || !B2_BUCKET_NAME || !B2_BUCKET_ID) {
