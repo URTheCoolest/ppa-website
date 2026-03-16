@@ -39,8 +39,8 @@ export async function GET(req: NextRequest) {
     await b2.authorize()
 
     // Get download authorization for this specific file
-    // The prefix must match the start of the filename
     const folderPrefix = path.substring(0, path.lastIndexOf('/') + 1)
+    console.log('Getting auth for prefix:', folderPrefix)
     
     const authResponse = await b2.getDownloadAuthorization({
       bucketId: B2_BUCKET_ID,
@@ -48,16 +48,20 @@ export async function GET(req: NextRequest) {
       validDurationInSeconds: 3600
     })
 
-    const { authorizationToken, token, downloadUrl: authDownloadUrl } = authResponse.data
+    const { authorizationToken } = authResponse.data
     
-    console.log('Got auth token')
-
-    // Use the authorized download URL with the token
-    const finalUrl = `${authDownloadUrl}/file/${B2_BUCKET_NAME}/${path}?Authorization=${authorizationToken}`
+    // Build the authorized download URL
+    // Using the correct Backblaze download endpoint format
+    const b2DownloadUrl = 'https://f003.backblazefile.com'
+    const authorizedUrl = `${b2DownloadUrl}/file/${B2_BUCKET_NAME}/${path}?Authorization=${authorizationToken}`
     
-    console.log('Redirecting to authorized URL')
+    console.log('Returning authorized URL')
 
-    return NextResponse.redirect(finalUrl)
+    return NextResponse.json({ 
+      url: authorizedUrl,
+      path: path,
+      token: authorizationToken ? 'present' : 'missing'
+    })
 
   } catch (error: any) {
     console.error('Download error:', error)
