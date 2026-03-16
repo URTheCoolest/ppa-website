@@ -71,7 +71,6 @@ export default function HomePage() {
           </p>
           <div className="flex flex-wrap justify-center items-center gap-8 md:gap-12">
             <img src="/trusted-logos/aj247smedia.jpg" alt="AJ247s Media" className="h-12 w-auto grayscale hover:grayscale-0 transition-all opacity-70 hover:opacity-100" />
-            <img src="/trusted-logos/fca-krakow.jpg" alt="FCA Krakow" className="h-12 w-auto grayscale hover:grayscale-0 transition-all opacity-70 hover:opacity-100" />
             <img src="/trusted-logos/fox-photography.jpg" alt="Fox Photography" className="h-12 w-auto grayscale hover:grayscale-0 transition-all opacity-70 hover:opacity-100" />
             <img src="/trusted-logos/mjak-maloposka.jpg" alt="Mjak Maloposka" className="h-12 w-auto grayscale hover:grayscale-0 transition-all opacity-70 hover:opacity-100" />
             <img src="/trusted-logos/red-light.jpg" alt="Red Light Media" className="h-12 w-auto grayscale hover:grayscale-0 transition-all opacity-70 hover:opacity-100" />
