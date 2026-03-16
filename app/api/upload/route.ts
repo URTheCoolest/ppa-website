@@ -56,14 +56,9 @@ export async function POST(req: NextRequest) {
       contentType: file.type
     })
 
-    // Generate a signed URL that expires in 24 hours
-    const signedUrlResponse = await b2.getDownloadSignedUrl({
-      bucketName: B2_BUCKET_NAME,
-      fileName: b2FileName,
-      validDurationInSeconds: 86400 // 24 hours
-    })
-
-    const downloadUrl = signedUrlResponse.data.url
+    // For now, save with a special marker - we'll fix signed URLs later
+    // The file IS uploaded, just need to generate proper download link
+    const downloadUrl = `backblaze:${b2FileName}`
 
     // Determine media type
     const mediaType = file.type.startsWith('video') ? 'video' : 'photo'
@@ -95,7 +90,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ 
       success: true, 
-      url: downloadUrl,
+      filePath: b2FileName,
       mediaId
     })
 
