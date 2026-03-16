@@ -214,17 +214,28 @@ export default function LicenseRequestPage() {
           <div>
             <div className="border dark:border-gray-700 rounded-lg overflow-hidden">
               <div className="aspect-square bg-gray-200 dark:bg-gray-800 relative">
-                {media.thumbnail_path ? (
-                  <img 
-                    src={media.thumbnail_path} 
-                    alt={media.filename}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-6xl text-gray-400">
-                    {media.media_type === 'photo' ? '📷' : '🎬'}
-                  </div>
-                )}
+                {(() => {
+                  // Get image URL - handle different storage types
+                  const getImageUrl = () => {
+                    if (media.file_path?.startsWith('backblaze:')) {
+                      const path = media.file_path.replace('backblaze:', '')
+                      return `/api/download?path=${encodeURIComponent(path)}`
+                    }
+                    return media.file_path || media.thumbnail_path
+                  }
+                  const imgUrl = getImageUrl()
+                  return imgUrl ? (
+                    <img 
+                      src={imgUrl} 
+                      alt={media.filename}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-6xl text-gray-400">
+                      {media.media_type === 'photo' ? '📷' : '🎬'}
+                    </div>
+                  )
+                })()}
                 <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-2">
                   {media.media_id}
                 </div>
