@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 const B2_KEY_ID = process.env.BACKBLAZE_KEY_ID
 const B2_APP_KEY = process.env.BACKBLAZE_APP_KEY
 const B2_BUCKET_NAME = process.env.BACKBLAZE_BUCKET_NAME
+const B2_BUCKET_ID = process.env.BACKBLAZE_BUCKET_ID
 const B2_DOWNLOAD_DOMAIN = process.env.BACKBLAZE_DOWNLOAD_DOMAIN
 
 export async function GET(req: NextRequest) {
@@ -18,7 +19,7 @@ export async function GET(req: NextRequest) {
     console.log('Download request for path:', path)
 
     // Check if Backblaze env vars are configured
-    if (!B2_KEY_ID || !B2_APP_KEY || !B2_BUCKET_NAME) {
+    if (!B2_KEY_ID || !B2_APP_KEY || !B2_BUCKET_NAME || !B2_BUCKET_ID) {
       console.error('Missing Backblaze configuration')
       return NextResponse.json({ error: 'Download service not configured' }, { status: 500 })
     }
@@ -33,18 +34,19 @@ export async function GET(req: NextRequest) {
     // Authorize
     await b2.authorize()
 
-    // Use getDownloadAuthorization with fileNamePrefix to allow downloading any file in that folder
-    // This creates a token that allows downloading any file with the given prefix
+    // Get download authorization with fileNamePrefix
+    // The prefix should be the folder path, not the full file path
     const folderPrefix = path.substring(0, path.lastIndexOf('/') + 1)
     console.log('Folder prefix:', folderPrefix)
     
     const authResponse = await b2.getDownloadAuthorization({
-      bucketName: B2_BUCKET_NAME,
+      bucketId: B2_BUCKET_ID,
       fileNamePrefix: folderPrefix,
       validDurationInSeconds: 3600
     })
 
     const { authorizationToken } = authResponse.data
+    console.log('Got auth token')
 
     // Build URL using the S3-compatible download domain
     const downloadDomain = B2_DOWNLOAD_DOMAIN || 's3.eu-central-003.backblazeb2.com'
