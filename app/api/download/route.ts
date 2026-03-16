@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 const B2_KEY_ID = process.env.BACKBLAZE_KEY_ID
 const B2_APP_KEY = process.env.BACKBLAZE_APP_KEY
 const B2_BUCKET_NAME = process.env.BACKBLAZE_BUCKET_NAME
-const B2_BUCKET_ID = process.env.BACKBLAZE_BUCKET_ID
+const B2_DOWNLOAD_DOMAIN = process.env.BACKBLAZE_DOWNLOAD_DOMAIN
 
 export async function GET(req: NextRequest) {
   try {
@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'No path provided' }, { status: 400 })
     }
 
-    console.log('Download request for:', path)
+    console.log('Download request for path:', path)
 
     // Check if Backblaze env vars are configured
     if (!B2_KEY_ID || !B2_APP_KEY || !B2_BUCKET_NAME) {
@@ -31,25 +31,26 @@ export async function GET(req: NextRequest) {
     })
 
     // Authorize
-    console.log('Authorizing with Backblaze...')
     await b2.authorize()
-    console.log('Authorized successfully')
 
-    // Get download authorization
-    console.log('Getting download authorization for:', path)
+    // Use getDownloadAuthorization with fileNamePrefix to allow downloading any file in that folder
+    // This creates a token that allows downloading any file with the given prefix
+    const folderPrefix = path.substring(0, path.lastIndexOf('/') + 1)
+    console.log('Folder prefix:', folderPrefix)
+    
     const authResponse = await b2.getDownloadAuthorization({
       bucketName: B2_BUCKET_NAME,
-      fileName: path,
-      validDurationInSeconds: 3600,
-      bucketId: B2_BUCKET_ID
+      fileNamePrefix: folderPrefix,
+      validDurationInSeconds: 3600
     })
 
     const { authorizationToken } = authResponse.data
 
-    // Build URL - use the download URL from the auth response
-    const downloadUrl = `${b2.downloadUrl}/file/${B2_BUCKET_NAME}/${path}?Authorization=${authorizationToken}`
+    // Build URL using the S3-compatible download domain
+    const downloadDomain = B2_DOWNLOAD_DOMAIN || 's3.eu-central-003.backblazeb2.com'
+    const downloadUrl = `https://${downloadDomain}/${B2_BUCKET_NAME}/${path}?Authorization=${authorizationToken}`
 
-    console.log('Redirecting to:', downloadUrl.substring(0, 100) + '...')
+    console.log('Redirecting to download URL')
 
     return NextResponse.redirect(downloadUrl)
 
