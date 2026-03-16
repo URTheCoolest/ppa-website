@@ -63,6 +63,23 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Trusted By */}
+      <section className="py-16 bg-gray-50 dark:bg-gray-900">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="text-center text-sm font-medium text-gray-500 dark:text-gray-400 mb-8">
+            Trusted by leading organizations
+          </p>
+          <div className="flex flex-wrap justify-center items-center gap-8 md:gap-12">
+            <img src="/trusted-logos/aj247smedia.jpg" alt="AJ247s Media" className="h-12 w-auto grayscale hover:grayscale-0 transition-all opacity-70 hover:opacity-100" />
+            <img src="/trusted-logos/fca-krakow.jpg" alt="FCA Krakow" className="h-12 w-auto grayscale hover:grayscale-0 transition-all opacity-70 hover:opacity-100" />
+            <img src="/trusted-logos/fox-photography.jpg" alt="Fox Photography" className="h-12 w-auto grayscale hover:grayscale-0 transition-all opacity-70 hover:opacity-100" />
+            <img src="/trusted-logos/mjak-maloposka.jpg" alt="Mjak Maloposka" className="h-12 w-auto grayscale hover:grayscale-0 transition-all opacity-70 hover:opacity-100" />
+            <img src="/trusted-logos/red-light.jpg" alt="Red Light Media" className="h-12 w-auto grayscale hover:grayscale-0 transition-all opacity-70 hover:opacity-100" />
+            <img src="/trusted-logos/rnr.jpg" alt="RnR" className="h-12 w-auto grayscale hover:grayscale-0 transition-all opacity-70 hover:opacity-100" />
+          </div>
+        </div>
+      </section>
+
       {/* Features */}
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
