@@ -92,10 +92,10 @@ export async function GET(req: NextRequest) {
     
     // Add watermark if requested
     if (watermark && contentType.startsWith('image/') && watermarkBuffer) {
-      console.log('Adding diagonal tiled watermark...')
+      console.log('Adding tiled watermark...')
       
-      // Resize watermark logo to be 20% of image width
-      const watermarkWidth = Math.floor(finalWidth * 0.2)
+      // Resize watermark logo to be 25% of image width
+      const watermarkWidth = Math.floor(finalWidth * 0.25)
       
       // Resize the logo
       const resizedWmBuffer = await sharp(watermarkBuffer)
@@ -103,7 +103,7 @@ export async function GET(req: NextRequest) {
           fit: 'inside',
           withoutEnlargEMENT: true 
         })
-        .ensureAlpha(0.4) // 40% opacity
+        .ensureAlpha(0.5)
         .png()
         .toBuffer()
       
@@ -113,20 +113,16 @@ export async function GET(req: NextRequest) {
       
       console.log('Logo size:', wmWidth, 'x', wmHeight)
       
-      // Create tiled diagonal pattern
-      const tileSpacingX = Math.floor(wmWidth * 1.5)
-      const tileSpacingY = Math.floor(wmHeight * 2)
+      // Simple grid tiling
+      const spacingX = wmWidth + 50
+      const spacingY = wmHeight + 50
       
-      // Build image with resize first
+      // Build image
       let image = sharp(originalBuffer).resize(finalWidth, finalHeight, { fit: 'fill' })
       
-      // Add tiled watermarks
-      for (let row = -1; row < Math.ceil(finalHeight / tileSpacingY) + 1; row++) {
-        for (let col = -1; col < Math.ceil(finalWidth / tileSpacingX) + 1; col++) {
-          const offsetX = (row % 2) * Math.floor(tileSpacingX / 2)
-          const x = col * tileSpacingX + offsetX
-          const y = row * tileSpacingY
-          
+      // Add grid of logos
+      for (let y = 0; y < finalHeight + wmHeight; y += spacingY) {
+        for (let x = 0; x < finalWidth + wmWidth; x += spacingX) {
           image = image.composite([{
             input: resizedWmBuffer,
             top: y,
@@ -136,13 +132,12 @@ export async function GET(req: NextRequest) {
       }
       
       const outputBuffer = await image.toBuffer()
-      const outputContentType = 'image/png'
 
       return new NextResponse(outputBuffer, {
         headers: {
-          'Content-Type': outputContentType,
+          'Content-Type': 'image/png',
           'Content-Length': outputBuffer.length.toString(),
-          'Cache-Control': 'no-cache, no-store, must-revalidate'
+          'Cache-Control': 'no-cache'
         }
       })
     } else {
