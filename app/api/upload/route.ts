@@ -5,7 +5,6 @@ import { createAdminClient } from '@/lib/supabase/admin'
 const B2_KEY_ID = process.env.BACKBLAZE_KEY_ID!
 const B2_APP_KEY = process.env.BACKBLAZE_APP_KEY!
 const B2_BUCKET_ID = process.env.BACKBLAZE_BUCKET_ID!
-const B2_BUCKET_NAME = process.env.BACKBLAZE_BUCKET_NAME!
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,10 +22,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
 
-    // Read file buffer
-    const arrayBuffer = await file.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
-
     // Import Backblaze
     const B2 = require('backblaze-b2')
     const b2 = new B2({
@@ -37,19 +32,31 @@ export async function POST(req: NextRequest) {
     // Authorize
     await b2.authorize()
 
+    // Get upload URL
+    const uploadUrlResponse = await b2.getUploadUrl({
+      bucketId: B2_BUCKET_ID
+    })
+
+    const { uploadUrl, authorizationToken } = uploadUrlResponse.data
+
+    // Read file buffer
+    const arrayBuffer = await file.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
+
     // Upload to Backblaze
     const fileExt = file.name.split('.').pop()
     const b2FileName = `${photographerId}/${folderId}/${mediaId}.${fileExt}`
 
-    const uploadResult = await b2.upload({
-      bucketId: B2_BUCKET_ID,
+    const uploadResult = await b2.uploadFile({
+      uploadUrl: uploadUrl,
+      uploadAuthToken: authorizationToken,
       fileName: b2FileName,
       data: buffer,
       contentType: file.type
     })
 
     // Get the download URL
-    const downloadUrl = `https://${process.env.BACKBLAZE_DOWNLOAD_DOMAIN || 'ppa-media.backblazeb2.com'}/${b2FileName}`
+    const downloadUrl = `https://s3.eu-central-003.backblazeb2.com/ppa-media/${b2FileName}`
 
     // Determine media type
     const mediaType = file.type.startsWith('video') ? 'video' : 'photo'
