@@ -176,43 +176,24 @@ export default function UploadPage() {
         const mediaFile = files[i]
         const mediaId = `PPA-MEDIA-${String(newCount + i).padStart(5, '0')}`
         
-        // Upload to Supabase Storage
-        const fileExt = mediaFile.file.name.split('.').pop()
-        const filePath = `${user.id}/${folderIdToUse}/${mediaId}.${fileExt}`
+        // Upload to Backblaze B2 via API
+        const formData = new FormData()
+        formData.append('file', mediaFile.file)
+        formData.append('photographerId', user.id)
+        formData.append('folderId', folderIdToUse)
+        formData.append('mediaId', mediaId)
+        formData.append('filename', mediaFile.filename)
+        formData.append('description', mediaFile.description)
+        formData.append('shooting_date', mediaFile.shooting_date)
+        formData.append('category', mediaFile.category)
 
-        const { error: uploadError } = await supabase.storage
-          .from('media')
-          .upload(filePath, mediaFile.file)
+        const uploadResponse = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData
+        })
 
-        if (uploadError) throw uploadError
-
-        // Get public URL
-        const { data: { publicUrl } } = supabase.storage
-          .from('media')
-          .getPublicUrl(filePath)
-
-        // Determine media type
-        const mediaType = mediaFile.file.type.startsWith('video/') ? 'video' : 'photo'
-
-        // Insert media record
-        const { error: mediaError } = await supabase
-          .from('media')
-          .insert({
-            photographer_id: user.id,
-            folder_id: folderIdToUse,
-            media_id: mediaId,
-            filename: mediaFile.filename,
-            media_type: mediaType,
-            file_path: publicUrl,
-            description: mediaFile.description,
-            shooting_date: mediaFile.shooting_date,
-            category: mediaFile.category,
-            keywords: mediaFile.description.toLowerCase().split(' ').filter(w => w.length > 2),
-            is_approved: false, // Requires admin approval
-            price_pln: mediaType === 'photo' ? 20 : 50, // Default price
-          })
-
-        if (mediaError) throw mediaError
+        const uploadResult = await uploadResponse.json()
+        if (uploadResult.error) throw new Error(uploadResult.error)
       }
 
       setSuccess(true)
