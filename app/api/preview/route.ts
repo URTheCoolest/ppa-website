@@ -92,10 +92,10 @@ export async function GET(req: NextRequest) {
     
     // Add watermark if requested
     if (watermark && contentType.startsWith('image/') && watermarkBuffer) {
-      console.log('Adding watermark...')
+      console.log('Adding diagonal tiled watermark...')
       
-      // Resize watermark to be 40% of image width
-      const watermarkWidth = Math.floor(finalWidth * 0.4)
+      // Resize watermark to be 25% of image width
+      const watermarkWidth = Math.floor(finalWidth * 0.25)
       
       const wmBuffer = await sharp(watermarkBuffer)
         .resize(watermarkWidth, null, { 
@@ -109,33 +109,54 @@ export async function GET(req: NextRequest) {
       const wmWidth = wmMeta.width || watermarkWidth
       const wmHeight = wmMeta.height || Math.floor(watermarkWidth * 0.7)
       
-      // Calculate center position
-      const left = Math.floor((finalWidth - wmWidth) / 2)
-      const top = Math.floor((finalHeight - wmHeight) / 2)
+      console.log('Watermark size:', wmWidth, 'x', wmHeight)
       
-      console.log('Watermark:', wmWidth, 'x', wmHeight, 'at:', left, ',', top)
+      // Create tiled diagonal watermarks
+      // We'll create a larger canvas with the watermark repeated at angles
+      const tileSize = Math.max(wmWidth, wmHeight) * 3
+      const tilesX = Math.ceil(finalWidth / tileSize) + 1
+      const tilesY = Math.ceil(finalHeight / tileSize) + 1
       
-      // Create dark overlay
-      const overlaySvg = Buffer.from(`
-        <svg width="${wmWidth}" height="${wmHeight}">
-          <rect width="100%" height="100%" fill="black" opacity="0.6"/>
-        </svg>
-      `)
+      // Create SVG with rotated watermark tiles
+      let svgContent = `<svg width="${finalWidth}" height="${finalHeight}" xmlns="http://www.w3.org/2000/svg">`
       
-      // Build the full pipeline: resize -> overlay -> watermark
+      // Add dark overlay first
+      svgContent += `<rect width="100%" height="100%" fill="black" opacity="0.3"/>`
+      
+      // Add rotated watermarks in a grid
+      for (let row = -1; row < tilesY + 1; row++) {
+        for (let col = -1; col < tilesX + 1; col++) {
+          const x = col * tileSize + (row % 2 === 0 ? 0 : tileSize / 2)
+          const y = row * tileSize
+          
+          // We'll embed the watermark as an image with rotation
+          // For now, let's create a text-based diagonal watermark
+          svgContent += `<text 
+            x="${x + tileSize/2}" 
+            y="${y + tileSize/2}" 
+            transform="rotate(-45, ${x + tileSize/2}, ${y + tileSize/2})"
+            fill="white" 
+            fill-opacity="0.3"
+            font-family="Arial, sans-serif" 
+            font-size="${Math.floor(wmWidth / 4)}px" 
+            font-weight="bold"
+            text-anchor="middle">PPA PREVIEW</text>`
+        }
+      }
+      
+      svgContent += '</svg>'
+      
+      const svgBuffer = Buffer.from(svgContent)
+      
+      // Build the full pipeline: resize -> SVG watermark
       let image = sharp(originalBuffer)
         .resize(finalWidth, finalHeight, { 
           fit: 'fill'
         })
         .composite([{
-          input: overlaySvg,
-          top: top,
-          left: left
-        }])
-        .composite([{
-          input: wmBuffer,
-          top: top,
-          left: left
+          input: svgBuffer,
+          top: 0,
+          left: 0
         }])
       
       const outputBuffer = await image.toBuffer()
