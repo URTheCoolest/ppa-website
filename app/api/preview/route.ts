@@ -94,67 +94,48 @@ export async function GET(req: NextRequest) {
     if (watermark && contentType.startsWith('image/') && watermarkBuffer) {
       console.log('Adding diagonal tiled watermark...')
       
-      // Resize watermark to be 20% of image width
+      // Resize watermark logo to be 20% of image width
       const watermarkWidth = Math.floor(finalWidth * 0.2)
       
-      // Get watermark dimensions
-      const wmMeta = await sharp(watermarkBuffer).metadata()
-      const wmAspect = (wmMeta.height || 630) / (wmMeta.width || 888)
-      const wmHeight = Math.floor(watermarkWidth * wmAspect)
+      // Resize the logo
+      const resizedWmBuffer = await sharp(watermarkBuffer)
+        .resize(watermarkWidth, null, { 
+          fit: 'inside',
+          withoutEnlargEMENT: true 
+        })
+        .ensureAlpha(0.3) // 30% opacity
+        .toBuffer()
       
-      console.log('Watermark size:', watermarkWidth, 'x', wmHeight)
+      const wmMeta = await sharp(resizedWmBuffer).metadata()
+      const wmWidth = wmMeta.width || watermarkWidth
+      const wmHeight = wmMeta.height || Math.floor(watermarkWidth * 0.7)
       
-      // Create diagonal tiled watermarks using SVG
-      const tileSpacing = Math.max(watermarkWidth, wmHeight) * 2
-      const tilesX = Math.ceil(finalWidth / tileSpacing) + 2
-      const tilesY = Math.ceil(finalHeight / tileSpacing) + 2
+      console.log('Logo size:', wmWidth, 'x', wmHeight)
       
-      // Build SVG with rotated text watermarks
-      let svgContent = `<svg width="${finalWidth}" height="${finalHeight}" xmlns="http://www.w3.org/2000/svg">`
+      // Start building the image with resize
+      let image = sharp(originalBuffer).resize(finalWidth, finalHeight, { fit: 'fill' })
       
-      // Semi-transparent dark overlay
-      svgContent += `<rect width="100%" height="100%" fill="black" opacity="0.25"/>`
+      // Add diagonal tiled watermarks by compositing multiple times
+      // Calculate tile spacing
+      const tileSpacing = Math.max(wmWidth, wmHeight) * 2
       
-      const fontSize = Math.floor(watermarkWidth / 3)
-      
-      // Create tiled diagonal text
-      for (let row = -1; row < tilesY; row++) {
-        for (let col = -1; col < tilesX; col++) {
-          const x = col * tileSpacing
-          const y = row * tileSpacing
+      // First pass: create tiled pattern
+      for (let row = -1; row < Math.ceil(finalHeight / tileSpacing) + 1; row++) {
+        for (let col = -1; col < Math.ceil(finalWidth / tileSpacing) + 1; col++) {
+          const offsetX = (row % 2) * Math.floor(tileSpacing / 2)
+          let x = col * tileSpacing + offsetX - Math.floor(wmWidth / 2)
+          let y = row * tileSpacing - Math.floor(wmHeight / 2)
           
-          // Offset every other row for brick pattern
-          const offsetX = (row % 2) * (tileSpacing / 2)
-          
-          svgContent += `<text 
-            x="${x + offsetX}" 
-            y="${y}"
-            transform="rotate(-45, ${x + offsetX}, ${y})"
-            fill="white" 
-            fill-opacity="0.25"
-            font-family="Arial, sans-serif" 
-            font-size="${fontSize}px" 
-            font-weight="bold"
-            text-anchor="middle">PPA PREVIEW</text>`
+          // Only composite if visible
+          if (x + wmWidth > 0 && x < finalWidth && y + wmHeight > 0 && y < finalHeight) {
+            image = image.composite([{
+              input: resizedWmBuffer,
+              top: Math.max(0, y),
+              left: Math.max(0, x)
+            }])
+          }
         }
       }
-      
-      svgContent += '</svg>'
-      
-      const svgBuffer = Buffer.from(svgContent)
-      
-      console.log('SVG created, size:', svgBuffer.length)
-      
-      // Build the full pipeline
-      let image = sharp(originalBuffer)
-        .resize(finalWidth, finalHeight, { 
-          fit: 'fill'
-        })
-        .composite([{
-          input: svgBuffer,
-          top: 0,
-          left: 0
-        }])
       
       const outputBuffer = await image.toBuffer()
       const outputContentType = contentType || 'image/jpeg'
