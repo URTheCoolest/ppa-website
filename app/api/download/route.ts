@@ -50,17 +50,30 @@ export async function GET(req: NextRequest) {
 
     const { authorizationToken } = authResponse.data
     
-    // Build the authorized download URL
-    // Using the correct Backblaze download endpoint format
-    const b2DownloadUrl = 'https://f003.backblazefile.com'
-    const authorizedUrl = `${b2DownloadUrl}/file/${B2_BUCKET_NAME}/${path}?Authorization=${authorizationToken}`
+    // The correct Backblaze download URL format
+    // Based on their documentation, the download URL is: https://[server].backblazefile.com/file/[bucket]/[path]
+    // The server number comes from the bucket - let's check what files are available first
     
-    console.log('Returning authorized URL')
+    // List files to get the correct download URL
+    const listResponse = await b2.listFileNames({
+      bucketId: B2_BUCKET_ID,
+      prefix: path,
+      maxFileCount: 1
+    })
 
+    console.log('Files:', JSON.stringify(listResponse.data))
+    
+    if (!listResponse.data.files || listResponse.data.files.length === 0) {
+      return NextResponse.json({ error: 'File not found' }, { status: 404 })
+    }
+
+    const file = listResponse.data.files[0]
+    
+    // Get the download URL from the file info
+    // It might have an attribute we can use
     return NextResponse.json({ 
-      url: authorizedUrl,
-      path: path,
-      token: authorizationToken ? 'present' : 'missing'
+      file: file,
+      authToken: authorizationToken ? 'present' : 'missing'
     })
 
   } catch (error: any) {
