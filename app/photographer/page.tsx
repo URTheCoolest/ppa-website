@@ -6,6 +6,16 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import ThemeToggle from '@/components/ThemeToggle'
 
+// Helper to get preview image URL (watermarked)
+function getPreviewUrl(item: any): string {
+  if (!item.file_path) return ''
+  if (item.file_path.startsWith('backblaze:')) {
+    const path = item.file_path.replace('backblaze:', '')
+    return `/api/preview?path=${encodeURIComponent(path)}&width=400&watermark=true`
+  }
+  return item.thumbnail_path || item.file_path
+}
+
 export default function PhotographerPortal() {
   const [profile, setProfile] = useState<any>(null)
   const [media, setMedia] = useState<any[]>([])
@@ -166,8 +176,8 @@ export default function PhotographerPortal() {
               {media.slice(0, 8).map((item) => (
                 <div key={item.id} className="border rounded-lg overflow-hidden">
                   <div className="aspect-square bg-gray-200">
-                    {item.thumbnail_path ? (
-                      <img src={item.thumbnail_path} alt={item.filename} className="w-full h-full object-cover" />
+                    {getPreviewUrl(item) ? (
+                      <img src={getPreviewUrl(item)} alt={item.filename} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-400">
                         {item.media_type === 'photo' ? '📷' : '🎬'}
