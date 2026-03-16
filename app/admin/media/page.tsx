@@ -226,7 +226,7 @@ export default function MediaPage() {
                   </div>
                 </div>
               </div>
-            )}
+            ))}
           </div>
         )}
       </main>
