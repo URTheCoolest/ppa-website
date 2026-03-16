@@ -35,8 +35,7 @@ export async function GET(req: NextRequest) {
     // Authorize
     await b2.authorize()
 
-    // Get download authorization with fileNamePrefix
-    // The prefix should be the folder path, not the full file path
+    // Get download authorization
     const folderPrefix = path.substring(0, path.lastIndexOf('/') + 1)
     console.log('Folder prefix:', folderPrefix)
     
@@ -49,9 +48,9 @@ export async function GET(req: NextRequest) {
     const { authorizationToken } = authResponse.data
     console.log('Got auth token')
 
-    // Build URL using the S3-compatible download domain
-    const downloadDomain = B2_DOWNLOAD_DOMAIN || 's3.eu-central-003.backblazeb2.com'
-    const downloadUrl = `https://${downloadDomain}/${B2_BUCKET_NAME}/${path}?Authorization=${authorizationToken}`
+    // Use Backblaze's native download URL (not S3-compatible)
+    // The format is: https://[downloadUrl]/file/[bucketName]/[fileName]?Authorization=[token]
+    const downloadUrl = `${b2.downloadUrl}/file/${B2_BUCKET_NAME}/${path}?Authorization=${authorizationToken}`
 
     console.log('Redirecting to download URL')
 
