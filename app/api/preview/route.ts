@@ -101,7 +101,7 @@ export async function GET(req: NextRequest) {
       // Resize logo to 15% of image width for tiling (larger for centered)
       const wmWidth = watermarkStyle === 'centered' 
         ? Math.floor(finalWidth * 0.4) 
-        : Math.floor(finalWidth * 0.15)
+        : Math.floor(finalWidth * 0.18)
       console.log('Target logo width:', wmWidth)
       
       const logoResized = await sharp(watermarkBuffer)
