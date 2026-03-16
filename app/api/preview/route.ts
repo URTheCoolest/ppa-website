@@ -115,7 +115,7 @@ export async function GET(req: NextRequest) {
       const logoH = logoMeta.height || wmWidth
       console.log('Logo actual:', logoW, 'x', logoH)
       
-      let img: sharp.Sharp
+      let img: ReturnType<typeof sharp>
       
       if (watermarkStyle === 'centered') {
         // Create dark background box for centered
@@ -154,7 +154,7 @@ export async function GET(req: NextRequest) {
         console.log('Rotated logo:', rotW, 'x', rotH)
         console.log('Tiles:', tilesX, 'x', tilesY)
         
-        const composites: sharp.OverlayOptions[] = []
+        const composites: any[] = []
         
         for (let y = -1; y < tilesY; y++) {
           for (let x = -1; x < tilesX; x++) {
@@ -186,7 +186,7 @@ export async function GET(req: NextRequest) {
         console.log('Tiles:', tilesX, 'x', tilesY, 'spacing:', spacingX, ',', spacingY)
         
         // Build composite operations array
-        const composites: sharp.OverlayOptions[] = []
+        const composites: any[] = []
         
         for (let y = 0; y < tilesY; y++) {
           for (let x = 0; x < tilesX; x++) {
