@@ -216,12 +216,12 @@ export default function LicenseRequestPage() {
               <div className="aspect-square bg-gray-200 dark:bg-gray-800 relative">
                 {(() => {
                   // Get image URL - handle different storage types
-                  const getImageUrl = () => {
+                  const getImageUrl = (): string => {
                     if (media.file_path?.startsWith('backblaze:')) {
                       const path = media.file_path.replace('backblaze:', '')
                       return `/api/download?path=${encodeURIComponent(path)}`
                     }
-                    return media.file_path || media.thumbnail_path
+                    return media.file_path || media.thumbnail_path || ''
                   }
                   const imgUrl = getImageUrl()
                   return imgUrl ? (

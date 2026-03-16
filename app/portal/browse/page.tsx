@@ -170,12 +170,13 @@ export default function BrowsePage() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {media.map((item) => {
               // Get image URL - handle different storage types
-              const getImageUrl = () => {
+              const getImageUrl = (): string => {
                 if (item.file_path?.startsWith('backblaze:')) {
-                  // New Backblaze upload - use download API
                   const path = item.file_path.replace('backblaze:', '')
                   return `/api/download?path=${encodeURIComponent(path)}`
                 }
+                return item.file_path || item.thumbnail_path || ''
+              }
                 return item.file_path || item.thumbnail_path
               }
               
