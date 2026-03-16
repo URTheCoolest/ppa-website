@@ -8,6 +8,9 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "PPA - People Press Agency",
   description: "Premium Photo & Video Agency connecting talented photographers with media companies, brands, and businesses worldwide.",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({
