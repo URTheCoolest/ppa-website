@@ -92,11 +92,10 @@ export async function GET(req: NextRequest) {
     
     // Add watermark if requested
     if (watermark && contentType.startsWith('image/') && watermarkBuffer) {
-      console.log('Adding watermark logo, buffer size:', watermarkBuffer.length)
+      console.log('Adding diagonal tiled watermark...')
       
-      // Resize watermark logo to be 50% of image width
-      const watermarkWidth = Math.floor(finalWidth * 0.5)
-      console.log('Watermark target width:', watermarkWidth)
+      // Resize watermark logo to be 20% of image width
+      const watermarkWidth = Math.floor(finalWidth * 0.2)
       
       // Resize the logo
       const resizedWmBuffer = await sharp(watermarkBuffer)
@@ -104,33 +103,39 @@ export async function GET(req: NextRequest) {
           fit: 'inside',
           withoutEnlargEMENT: true 
         })
-        .png() // Force PNG output
+        .ensureAlpha(0.4) // 40% opacity
+        .png()
         .toBuffer()
       
       const wmMeta = await sharp(resizedWmBuffer).metadata()
       const wmWidth = wmMeta.width || watermarkWidth
       const wmHeight = wmMeta.height || Math.floor(watermarkWidth * 0.7)
       
-      console.log('Logo resized to:', wmWidth, 'x', wmHeight)
+      console.log('Logo size:', wmWidth, 'x', wmHeight)
       
-      // Calculate center position
-      const left = Math.floor((finalWidth - wmWidth) / 2)
-      const top = Math.floor((finalHeight - wmHeight) / 2)
+      // Create tiled diagonal pattern
+      const tileSpacingX = Math.floor(wmWidth * 1.5)
+      const tileSpacingY = Math.floor(wmHeight * 2)
       
-      console.log('Compositing at position:', left, ',', top)
-      
-      // Build image with logo in center
+      // Build image with resize first
       let image = sharp(originalBuffer).resize(finalWidth, finalHeight, { fit: 'fill' })
       
-      image = image.composite([{
-        input: resizedWmBuffer,
-        top: top,
-        left: left
-      }])
+      // Add tiled watermarks
+      for (let row = -1; row < Math.ceil(finalHeight / tileSpacingY) + 1; row++) {
+        for (let col = -1; col < Math.ceil(finalWidth / tileSpacingX) + 1; col++) {
+          const offsetX = (row % 2) * Math.floor(tileSpacingX / 2)
+          const x = col * tileSpacingX + offsetX
+          const y = row * tileSpacingY
+          
+          image = image.composite([{
+            input: resizedWmBuffer,
+            top: y,
+            left: x
+          }])
+        }
+      }
       
       const outputBuffer = await image.toBuffer()
-      console.log('Output size:', outputBuffer.length)
-      
       const outputContentType = 'image/png'
 
       return new NextResponse(outputBuffer, {
