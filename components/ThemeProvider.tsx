@@ -39,6 +39,22 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>
+      <style jsx global>{`
+        /* Smooth theme transition */
+        html {
+          transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        body {
+          transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        /* Prevent flash during theme load */
+        html:not(.light):not(.dark) {
+          background-color: #ffffff;
+        }
+        html.dark {
+          background-color: #121212;
+        }
+      `}</style>
       {children}
     </ThemeContext.Provider>
   )
