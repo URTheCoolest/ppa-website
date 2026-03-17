@@ -70,7 +70,7 @@ export default function BrowsePage() {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('*')
       .eq('id', user.id)
       .single()
 
@@ -79,7 +79,7 @@ export default function BrowsePage() {
       return
     }
 
-    setUser(user)
+    setUser({ ...user, profile })
     loadMedia()
   }
 
@@ -154,9 +154,57 @@ export default function BrowsePage() {
                 My Requests
               </Link>
               <ThemeToggle />
-              <button onClick={handleLogout} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white text-sm font-medium">
-                Logout
-              </button>
+              
+              {/* Profile Dropdown */}
+              <div className="relative group">
+                <button className="flex items-center gap-2">
+                  {user?.profile?.avatar_url ? (
+                    <img 
+                      src={user.profile.avatar_url} 
+                      alt="Profile" 
+                      className="w-9 h-9 rounded-full object-cover border-2 border-blue-500"
+                    />
+                  ) : (
+                    <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center border-2 border-blue-500">
+                      <span className="text-white font-medium text-sm">
+                        {user?.email?.charAt(0).toUpperCase() || 'U'}
+                      </span>
+                    </div>
+                  )}
+                </button>
+                
+                {/* Dropdown Menu */}
+                <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-[#1E1E1E] border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                  <div className="p-3 border-b border-gray-200 dark:border-gray-700">
+                    <p className="font-medium text-gray-900 dark:text-white text-sm truncate">
+                      {user?.profile?.full_name || user?.email?.split('@')[0]}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                      {user?.email}
+                    </p>
+                  </div>
+                  <div className="p-2">
+                    <Link 
+                      href="/portal" 
+                      className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                    >
+                      Dashboard
+                    </Link>
+                    <Link 
+                      href="/portal/my-requests" 
+                      className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                    >
+                      My Requests
+                    </Link>
+                    <button 
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                </div>
+              </div>
             </nav>
           </div>
         </div>
