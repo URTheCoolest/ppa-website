@@ -112,7 +112,6 @@ export default function BrowsePage() {
     if (data) {
       if (reset) {
         setMedia(data)
-        setLoadedImages(new Set())
       } else {
         setMedia(prev => [...prev, ...data])
       }
