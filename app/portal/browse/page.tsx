@@ -2,10 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import ThemeToggle from '@/components/ThemeToggle'
-import { Search, Camera, Video, LogOut, Grid, Layout } from 'lucide-react'
+import { Search, Camera, Video, LogOut, Grid, Layout, Lock } from 'lucide-react'
 
 interface Media {
   id: string
@@ -28,18 +27,14 @@ function getPreviewUrl(item: Media): string {
   
   let path = item.file_path
   
-  // Extract path from different formats
   if (path.startsWith('backblaze:')) {
     path = path.replace('backblaze:', '')
   } else if (path.includes('/ppa-media/')) {
-    // Extract from Backblaze S3 URL
     path = path.split('/ppa-media/')[1]
   } else if (path.includes('/media/')) {
-    // Extract from Supabase storage URL
     path = path.split('/media/')[1]
   }
   
-  // Use our preview API with different watermark styles
   const styles = ['diagonal', 'centered', 'tiled']
   const randomStyle = styles[Math.floor(Math.random() * styles.length)]
   return `/api/preview?path=${encodeURIComponent(path)}&width=600&watermark=true&style=${randomStyle}`
@@ -52,8 +47,8 @@ export default function BrowsePage() {
   const [mediaType, setMediaType] = useState<'all' | 'photo' | 'video'>('all')
   const [user, setUser] = useState<any>(null)
   const [viewMode, setViewMode] = useState<'grid' | 'masonry'>('masonry')
+  const [pageLoading, setPageLoading] = useState(true)
 
-  const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
@@ -63,23 +58,16 @@ export default function BrowsePage() {
   const checkUser = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     
-    if (!user) {
-      router.push('/login')
-      return
+    if (user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+      setUser({ ...user, profile })
     }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile || profile.role !== 'client') {
-      router.push('/login')
-      return
-    }
-
-    setUser({ ...user, profile })
+    
+    setPageLoading(false)
     loadMedia()
   }
 
@@ -126,10 +114,14 @@ export default function BrowsePage() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
-    router.push('/login')
+    window.location.href = '/'
   }
 
-  if (!user) return <div className="p-8">Loading...</div>
+  if (pageLoading) return (
+    <div className="min-h-screen bg-white dark:bg-[#121212] flex items-center justify-center">
+      <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-white dark:bg-[#121212]">
@@ -147,64 +139,77 @@ export default function BrowsePage() {
               <span className="text-gray-900 dark:text-white font-medium">Browse Media</span>
             </div>
             <nav className="flex items-center gap-4">
-              <Link href="/portal" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white text-sm font-medium">
-                Dashboard
-              </Link>
-              <Link href="/portal/my-requests" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white text-sm font-medium">
-                My Requests
-              </Link>
+              {user && (
+                <>
+                  <Link href="/portal" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white text-sm font-medium">
+                    Dashboard
+                  </Link>
+                  <Link href="/portal/my-requests" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white text-sm font-medium">
+                    My Requests
+                  </Link>
+                </>
+              )}
               <ThemeToggle />
               
-              {/* Profile Dropdown */}
-              <div className="relative group">
-                <button className="flex items-center gap-2">
-                  {user?.profile?.avatar_url ? (
-                    <img 
-                      src={user.profile.avatar_url} 
-                      alt="Profile" 
-                      className="w-9 h-9 rounded-full object-cover border-2 border-blue-500"
-                    />
-                  ) : (
-                    <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center border-2 border-blue-500">
-                      <span className="text-white font-medium text-sm">
-                        {user?.email?.charAt(0).toUpperCase() || 'U'}
-                      </span>
+              {/* Profile/Login Section */}
+              {user ? (
+                <div className="relative group">
+                  <button className="flex items-center gap-2">
+                    {user?.profile?.avatar_url ? (
+                      <img 
+                        src={user.profile.avatar_url} 
+                        alt="Profile" 
+                        className="w-9 h-9 rounded-full object-cover border-2 border-blue-500"
+                      />
+                    ) : (
+                      <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center border-2 border-blue-500">
+                        <span className="text-white font-medium text-sm">
+                          {user?.email?.charAt(0).toUpperCase() || 'U'}
+                        </span>
+                      </div>
+                    )}
+                  </button>
+                  
+                  {/* Dropdown Menu */}
+                  <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-[#1E1E1E] border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                    <div className="p-3 border-b border-gray-200 dark:border-gray-700">
+                      <p className="font-medium text-gray-900 dark:text-white text-sm truncate">
+                        {user?.profile?.full_name || user?.email?.split('@')[0]}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        {user?.email}
+                      </p>
                     </div>
-                  )}
-                </button>
-                
-                {/* Dropdown Menu */}
-                <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-[#1E1E1E] border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                  <div className="p-3 border-b border-gray-200 dark:border-gray-700">
-                    <p className="font-medium text-gray-900 dark:text-white text-sm truncate">
-                      {user?.profile?.full_name || user?.email?.split('@')[0]}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                      {user?.email}
-                    </p>
-                  </div>
-                  <div className="p-2">
-                    <Link 
-                      href="/portal" 
-                      className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                    >
-                      Dashboard
-                    </Link>
-                    <Link 
-                      href="/portal/my-requests" 
-                      className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                    >
-                      My Requests
-                    </Link>
-                    <button 
-                      onClick={handleLogout}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                    >
-                      Logout
-                    </button>
+                    <div className="p-2">
+                      <Link 
+                        href="/portal" 
+                        className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                      >
+                        Dashboard
+                      </Link>
+                      <Link 
+                        href="/portal/my-requests" 
+                        className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                      >
+                        My Requests
+                      </Link>
+                      <button 
+                        onClick={handleLogout}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                      >
+                        Logout
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <Link
+                  href="/login"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                >
+                  Login
+                </Link>
+              )}
             </nav>
           </div>
         </div>
@@ -323,7 +328,7 @@ export default function BrowsePage() {
           <div className="masonry-grid">
             {media.map((item) => (
               <div key={item.id} className="masonry-item group">
-                <div className="border border-gray-200 dark:border-gray-700 rounded-2xl overflow-hidden bg-white dark:bg-[#1E1E1E] hover:shadow-xl transition-all">
+                <div className="bg-white dark:bg-[#1E1E1E] hover:shadow-xl transition-all">
                   <div className="relative bg-gray-100 dark:bg-gray-800">
                     {getPreviewUrl(item) ? (
                       <img 
@@ -339,13 +344,24 @@ export default function BrowsePage() {
                     )}
                     
                     {/* Hover Overlay */}
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
-                      <Link
-                        href={`/portal/license/${item.id}`}
-                        className="bg-white text-gray-900 px-6 py-2 rounded-full font-medium transform translate-y-4 group-hover:translate-y-0 transition-all"
-                      >
-                        License This
-                      </Link>
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                      {user ? (
+                        <Link
+                          href={`/portal/license/${item.id}`}
+                          className="bg-white text-gray-900 px-6 py-2 rounded-full font-medium transform translate-y-4 group-hover:translate-y-0 transition-all flex items-center gap-2"
+                        >
+                          <Lock className="w-4 h-4" />
+                          License This
+                        </Link>
+                      ) : (
+                        <Link
+                          href="/login"
+                          className="bg-blue-600 text-white px-6 py-2 rounded-full font-medium transform translate-y-4 group-hover:translate-y-0 transition-all flex items-center gap-2"
+                        >
+                          <Lock className="w-4 h-4" />
+                          Login to License
+                        </Link>
+                      )}
                     </div>
                     
                     {/* Media Type Badge */}
@@ -364,11 +380,6 @@ export default function BrowsePage() {
                       </div>
                     </div>
                   </div>
-                  
-                  <div className="p-4">
-                    <p className="font-medium text-gray-900 dark:text-white truncate">{item.filename}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{item.media_id}</p>
-                  </div>
                 </div>
               </div>
             ))}
@@ -377,7 +388,7 @@ export default function BrowsePage() {
           /* Grid Layout */
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {media.map((item) => (
-              <div key={item.id} className="border border-gray-200 dark:border-gray-700 rounded-2xl overflow-hidden bg-white dark:bg-[#1E1E1E] hover:shadow-xl transition-all group">
+              <div key={item.id} className="bg-white dark:bg-[#1E1E1E] hover:shadow-xl transition-all group">
                 <div className="aspect-square bg-gray-100 dark:bg-gray-800 relative">
                   {getPreviewUrl(item) ? (
                     <img 
@@ -393,13 +404,24 @@ export default function BrowsePage() {
                   )}
                   
                   {/* Hover Overlay */}
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
-                    <Link
-                      href={`/portal/license/${item.id}`}
-                      className="bg-white text-gray-900 px-6 py-2 rounded-full font-medium transform translate-y-4 group-hover:translate-y-0 transition-all"
-                    >
-                      License This
-                    </Link>
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                    {user ? (
+                      <Link
+                        href={`/portal/license/${item.id}`}
+                        className="bg-white text-gray-900 px-6 py-2 rounded-full font-medium transform translate-y-4 group-hover:translate-y-0 transition-all flex items-center gap-2"
+                      >
+                        <Lock className="w-4 h-4" />
+                        License This
+                      </Link>
+                    ) : (
+                      <Link
+                        href="/login"
+                        className="bg-blue-600 text-white px-6 py-2 rounded-full font-medium transform translate-y-4 group-hover:translate-y-0 transition-all flex items-center gap-2"
+                      >
+                        <Lock className="w-4 h-4" />
+                        Login to License
+                      </Link>
+                    )}
                   </div>
                   
                   {/* Price Badge */}
@@ -408,10 +430,6 @@ export default function BrowsePage() {
                       {item.price_pln} PLN
                     </div>
                   </div>
-                </div>
-                <div className="p-3">
-                  <p className="font-medium text-gray-900 dark:text-white truncate">{item.filename}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">{item.media_id}</p>
                 </div>
               </div>
             ))}

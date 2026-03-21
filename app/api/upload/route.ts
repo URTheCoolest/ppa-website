@@ -18,6 +18,8 @@ export async function POST(req: NextRequest) {
     const description = formData.get('description') as string
     const shootingDate = formData.get('shooting_date') as string
     const category = formData.get('category') as string
+    const location = formData.get('location') as string
+    const keywordsRaw = formData.get('keywords') as string
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
@@ -56,15 +58,27 @@ export async function POST(req: NextRequest) {
       contentType: file.type
     })
 
-    // For now, save with a special marker - we'll fix signed URLs later
-    // The file IS uploaded, just need to generate proper download link
     const downloadUrl = `backblaze:${b2FileName}`
 
     // Determine media type
     const mediaType = file.type.startsWith('video') ? 'video' : 'photo'
 
+    // Process keywords - split by comma and clean up
+    const keywords = keywordsRaw 
+      ? keywordsRaw.split(',').map((k: string) => k.trim().toLowerCase()).filter((k: string) => k.length > 0)
+      : []
+
     // Save to Supabase database
     const supabase = createAdminClient()
+
+    // Check if photographer has auto-approve enabled
+    const { data: photographer } = await supabase
+      .from('profiles')
+      .select('auto_approve_enabled')
+      .eq('id', photographerId)
+      .single()
+
+    const autoApprove = photographer?.auto_approve_enabled ?? true // Default to true for auto-approve
 
     const { error: mediaError } = await supabase
       .from('media')
@@ -72,14 +86,15 @@ export async function POST(req: NextRequest) {
         photographer_id: photographerId,
         folder_id: folderId,
         media_id: mediaId,
-        filename: filename,
+        filename: filename || mediaId,
         media_type: mediaType,
         file_path: downloadUrl,
         description: description,
         shooting_date: shootingDate,
         category: category,
-        keywords: description.toLowerCase().split(' ').filter((w: string) => w.length > 2),
-        is_approved: false,
+        location: location,
+        keywords: keywords,
+        is_approved: autoApprove, // Auto-approve by default
         price_pln: mediaType === 'photo' ? 20 : 50
       })
 
@@ -91,7 +106,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ 
       success: true, 
       filePath: b2FileName,
-      mediaId
+      mediaId,
+      approved: autoApprove
     })
 
   } catch (error: any) {
