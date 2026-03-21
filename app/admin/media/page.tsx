@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import ThemeToggle from '@/components/ThemeToggle'
-import { CheckSquare, Square, Trash2, CheckCircle, XCircle, Star, Image, Video, Loader2 } from 'lucide-react'
+import { CheckSquare, Square, Trash2, CheckCircle, XCircle, Star, Image, Video, Loader2, MousePointer2 } from 'lucide-react'
 
 // Helper to get preview image URL (watermarked)
 function getPreviewUrl(item: Media): string {
@@ -49,6 +49,7 @@ export default function MediaPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkAction, setBulkAction] = useState<string>('')
   const [processing, setProcessing] = useState(false)
+  const [lastClickedId, setLastClickedId] = useState<string | null>(null)
 
   const router = useRouter()
   const supabase = createClient()
@@ -79,7 +80,8 @@ export default function MediaPage() {
 
   const loadMedia = async () => {
     setLoading(true)
-    setSelectedIds(new Set()) // Clear selection on filter change
+    setSelectedIds(new Set())
+    setLastClickedId(null)
     
     let query = supabase
       .from('media')
@@ -131,6 +133,7 @@ export default function MediaPage() {
       await supabase.from('media').delete().eq('id', id)
     }
     setSelectedIds(new Set())
+    setLastClickedId(null)
     setProcessing(false)
     loadMedia()
   }
@@ -141,6 +144,7 @@ export default function MediaPage() {
       await supabase.from('media').update({ is_approved: approve }).eq('id', id)
     }
     setSelectedIds(new Set())
+    setLastClickedId(null)
     setProcessing(false)
     loadMedia()
   }
@@ -151,6 +155,7 @@ export default function MediaPage() {
       await supabase.from('media').update({ is_featured: feature }).eq('id', id)
     }
     setSelectedIds(new Set())
+    setLastClickedId(null)
     setProcessing(false)
     loadMedia()
   }
@@ -183,19 +188,74 @@ export default function MediaPage() {
   const toggleSelectAll = () => {
     if (selectedIds.size === filteredMedia.length) {
       setSelectedIds(new Set())
+      setLastClickedId(null)
     } else {
       setSelectedIds(new Set(filteredMedia.map(m => m.id)))
+      if (filteredMedia.length > 0) {
+        setLastClickedId(filteredMedia[filteredMedia.length - 1].id)
+      }
     }
   }
 
-  const toggleSelect = (id: string) => {
-    const newSet = new Set(selectedIds)
-    if (newSet.has(id)) {
-      newSet.delete(id)
+  // Click handler with Shift-click range selection
+  const handleCardClick = (id: string, e: React.MouseEvent) => {
+    if (e.shiftKey && lastClickedId) {
+      // Shift-click: select range
+      const visibleIds = filteredMedia.map(m => m.id)
+      const lastIndex = visibleIds.indexOf(lastClickedId)
+      const currentIndex = visibleIds.indexOf(id)
+      
+      if (lastIndex !== -1 && currentIndex !== -1) {
+        const start = Math.min(lastIndex, currentIndex)
+        const end = Math.max(lastIndex, currentIndex)
+        const rangeIds = visibleIds.slice(start, end + 1)
+        
+        setSelectedIds(prev => {
+          const newSet = new Set(prev)
+          rangeIds.forEach(rangeId => newSet.add(rangeId))
+          return newSet
+        })
+      }
+    } else if (e.ctrlKey || e.metaKey) {
+      // Ctrl/Cmd-click: toggle individual
+      setSelectedIds(prev => {
+        const newSet = new Set(prev)
+        if (newSet.has(id)) {
+          newSet.delete(id)
+        } else {
+          newSet.add(id)
+        }
+        return newSet
+      })
     } else {
-      newSet.add(id)
+      // Regular click: toggle single
+      setSelectedIds(prev => {
+        const newSet = new Set(prev)
+        if (newSet.has(id)) {
+          newSet.delete(id)
+        } else {
+          newSet.add(id)
+        }
+        return newSet
+      })
     }
-    setSelectedIds(newSet)
+    
+    setLastClickedId(id)
+  }
+
+  // Checkbox click (doesn't interfere with card selection)
+  const handleCheckboxClick = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setSelectedIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(id)) {
+        newSet.delete(id)
+      } else {
+        newSet.add(id)
+      }
+      return newSet
+    })
+    setLastClickedId(id)
   }
 
   const filteredMedia = media.filter(m => 
@@ -241,13 +301,23 @@ export default function MediaPage() {
           />
         </div>
 
+        {/* Selection Tips */}
+        {selectedIds.size === 0 && (
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-3 mb-6 flex items-center gap-3">
+            <MousePointer2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            <p className="text-sm text-blue-800 dark:text-blue-300">
+              <strong>Tip:</strong> Click cards to select • Shift+click for range • Ctrl/Cmd+click to toggle • Use Select All below
+            </p>
+          </div>
+        )}
+
         {/* Bulk Actions Bar */}
         <div className="bg-white dark:bg-[#1E1E1E] border border-gray-200 dark:border-gray-700 rounded-xl p-4 mb-6">
           <div className="flex flex-wrap items-center gap-4">
             {/* Select All */}
             <button
               onClick={toggleSelectAll}
-              className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 hover:text-blue-600"
+              className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 hover:text-blue-600 transition-colors"
             >
               {selectedIds.size === filteredMedia.length && filteredMedia.length > 0 ? (
                 <CheckSquare className="w-5 h-5 text-blue-600" />
@@ -259,7 +329,7 @@ export default function MediaPage() {
 
             {/* Selection Count */}
             {selectedIds.size > 0 && (
-              <span className="text-sm text-blue-600 font-medium">
+              <span className="text-sm text-blue-600 font-medium bg-blue-100 dark:bg-blue-900/30 px-3 py-1 rounded-full">
                 {selectedIds.size} selected
               </span>
             )}
@@ -298,8 +368,11 @@ export default function MediaPage() {
                 </button>
 
                 <button
-                  onClick={() => setSelectedIds(new Set())}
-                  className="text-sm text-gray-500 hover:text-gray-700"
+                  onClick={() => {
+                    setSelectedIds(new Set())
+                    setLastClickedId(null)
+                  }}
+                  className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400"
                 >
                   Clear selection
                 </button>
@@ -340,31 +413,38 @@ export default function MediaPage() {
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            {filteredMedia.map(item => (
+            {filteredMedia.map((item, index) => (
               <div 
                 key={item.id} 
-                className={`border rounded-xl overflow-hidden transition-all ${
+                onClick={(e) => handleCardClick(item.id, e)}
+                className={`cursor-pointer border-2 rounded-xl overflow-hidden transition-all relative ${
                   selectedIds.has(item.id) 
-                    ? 'border-blue-500 ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-[#121212]' 
-                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
+                    ? 'border-blue-500 ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-[#121212] bg-blue-50 dark:bg-blue-900/10' 
+                    : 'border-gray-200 dark:border-gray-700 hover:border-blue-400 hover:shadow-lg'
                 }`}
               >
-                {/* Selection Checkbox */}
-                <div className="absolute top-2 left-2 z-10">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      toggleSelect(item.id)
-                    }}
-                    className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${
-                      selectedIds.has(item.id)
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white/80 text-gray-400 hover:text-gray-600'
-                    }`}
-                  >
-                    {selectedIds.has(item.id) ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
-                  </button>
+                {/* Selection Indicator (Corner Checkmark) */}
+                <div 
+                  onClick={(e) => handleCheckboxClick(item.id, e)}
+                  className={`absolute top-2 left-2 z-20 w-7 h-7 rounded-md flex items-center justify-center transition-all cursor-pointer ${
+                    selectedIds.has(item.id)
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'bg-white/90 hover:bg-white text-gray-400 hover:text-blue-600'
+                  }`}
+                >
+                  {selectedIds.has(item.id) ? (
+                    <CheckSquare className="w-5 h-5" />
+                  ) : (
+                    <Square className="w-5 h-5" />
+                  )}
                 </div>
+
+                {/* Number indicator for range selection */}
+                {selectedIds.has(item.id) && (
+                  <div className="absolute top-2 right-2 z-20 bg-blue-600 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center">
+                    {Array.from(selectedIds).indexOf(item.id) + 1}
+                  </div>
+                )}
 
                 {/* Image */}
                 <div className="relative aspect-square bg-gray-100 dark:bg-gray-800">
@@ -377,9 +457,9 @@ export default function MediaPage() {
                   )}
                   
                   {/* Status Badges */}
-                  <div className="absolute top-2 right-2 flex gap-1">
+                  <div className="absolute bottom-2 right-2 flex gap-1">
                     {item.is_featured && (
-                      <span className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                      <span className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center" title="Featured">
                         <Star className="w-3 h-3 text-white fill-white" />
                       </span>
                     )}
@@ -398,7 +478,6 @@ export default function MediaPage() {
                   <div className="absolute bottom-2 left-2">
                     <span className="px-2 py-0.5 bg-black/60 text-white text-xs rounded flex items-center gap-1">
                       {item.media_type === 'photo' ? <Image className="w-3 h-3" /> : <Video className="w-3 h-3" />}
-                      {item.media_type}
                     </span>
                   </div>
                 </div>
@@ -412,39 +491,34 @@ export default function MediaPage() {
                   <p className="text-xs text-gray-400 dark:text-gray-500 truncate">
                     {item.profiles?.full_name || 'Unknown'}
                   </p>
-                  <p className="text-sm font-bold text-blue-600 mt-1">{item.price_pln} PLN</p>
-
-                  {/* Quick Actions */}
-                  <div className="flex gap-1 mt-2">
-                    <button
-                      onClick={() => toggleApproval(item.id, item.is_approved)}
-                      className={`flex-1 py-1 rounded text-xs font-medium transition-colors ${
-                        item.is_approved 
-                          ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' 
-                          : 'bg-green-100 text-green-800 hover:bg-green-200'
-                      }`}
-                      title={item.is_approved ? 'Unapprove' : 'Approve'}
-                    >
-                      {item.is_approved ? 'Unapprove' : 'Approve'}
-                    </button>
-                    <button
-                      onClick={() => toggleFeatured(item.id, item.is_featured)}
-                      className={`px-2 py-1 rounded text-xs ${
-                        item.is_featured 
-                          ? 'bg-blue-100 text-blue-800' 
-                          : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
-                      }`}
-                      title={item.is_featured ? 'Remove from featured' : 'Add to featured'}
-                    >
-                      <Star className={`w-3 h-3 ${item.is_featured ? 'fill-blue-600' : ''}`} />
-                    </button>
-                    <button
-                      onClick={() => deleteMedia(item.id)}
-                      className="px-2 py-1 rounded text-xs bg-red-100 text-red-800 hover:bg-red-200"
-                      title="Delete"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
+                  <div className="flex items-center justify-between mt-2">
+                    <p className="text-sm font-bold text-blue-600">{item.price_pln} PLN</p>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toggleApproval(item.id, item.is_approved)
+                        }}
+                        className={`w-7 h-7 rounded text-xs flex items-center justify-center transition-colors ${
+                          item.is_approved 
+                            ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' 
+                            : 'bg-green-100 text-green-800 hover:bg-green-200'
+                        }`}
+                        title={item.is_approved ? 'Unapprove' : 'Approve'}
+                      >
+                        {item.is_approved ? '✗' : '✓'}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          deleteMedia(item.id)
+                        }}
+                        className="w-7 h-7 rounded bg-red-100 text-red-800 hover:bg-red-200 flex items-center justify-center"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
