@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import ThemeToggle from '@/components/ThemeToggle'
-import { Search, Camera, Video, LogOut, Grid, Layout, Lock } from 'lucide-react'
+import { Search, Camera, Video, Grid, Layout, Lock, Loader2 } from 'lucide-react'
 
 interface Media {
   id: string
@@ -19,6 +19,11 @@ interface Media {
   price_pln: number
   photographer_id: string
   created_at: string
+}
+
+interface LoadedImage {
+  id: string
+  loaded: boolean
 }
 
 // Helper to get preview image URL (watermarked, smaller)
@@ -40,14 +45,28 @@ function getPreviewUrl(item: Media): string {
   return `/api/preview?path=${encodeURIComponent(path)}&width=600&watermark=true&style=${randomStyle}`
 }
 
+const ITEMS_PER_PAGE = 12
+
 export default function BrowsePage() {
   const [media, setMedia] = useState<Media[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [mediaType, setMediaType] = useState<'all' | 'photo' | 'video'>('all')
   const [user, setUser] = useState<any>(null)
   const [viewMode, setViewMode] = useState<'grid' | 'masonry'>('masonry')
   const [pageLoading, setPageLoading] = useState(true)
+  
+  // Pagination
+  const [page, setPage] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
+  const [totalCount, setTotalCount] = useState(0)
+  
+  // Image loading states
+  const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set())
+  
+  const observerRef = useRef<IntersectionObserver | null>(null)
+  const loadMoreRef = useRef<HTMLDivElement>(null)
 
   const supabase = createClient()
 
@@ -68,53 +87,100 @@ export default function BrowsePage() {
     }
     
     setPageLoading(false)
-    loadMedia()
+    loadMedia(true)
   }
 
-  const loadMedia = async () => {
-    setLoading(true)
+  const loadMedia = async (reset: boolean = false) => {
+    if (reset) {
+      setLoading(true)
+      setPage(0)
+    } else {
+      setLoadingMore(true)
+    }
+    
+    const currentPage = reset ? 0 : page
+    
     let query = supabase
       .from('media')
-      .select('*')
+      .select('*', { count: 'exact' })
       .eq('is_approved', true)
       .order('created_at', { ascending: false })
+      .range(currentPage * ITEMS_PER_PAGE, (currentPage + 1) * ITEMS_PER_PAGE - 1)
 
     if (mediaType !== 'all') {
       query = query.eq('media_type', mediaType)
     }
-
-    const { data } = await query.limit(50)
-    if (data) setMedia(data)
-    setLoading(false)
-  }
-
-  const handleSearch = async () => {
-    setLoading(true)
-    let query = supabase
-      .from('media')
-      .select('*')
-      .eq('is_approved', true)
 
     if (searchQuery) {
       query = query.or(`filename.ilike.%${searchQuery}%,media_id.ilike.%${searchQuery}%,keywords.cs.{${searchQuery}}`)
     }
 
-    if (mediaType !== 'all') {
-      query = query.eq('media_type', mediaType)
+    const { data, count } = await query
+    
+    if (data) {
+      if (reset) {
+        setMedia(data)
+        setLoadedImages(new Set())
+      } else {
+        setMedia(prev => [...prev, ...data])
+      }
+      setTotalCount(count || 0)
+      setHasMore(data.length === ITEMS_PER_PAGE)
     }
-
-    const { data } = await query.limit(50)
-    if (data) setMedia(data)
+    
     setLoading(false)
+    setLoadingMore(false)
   }
 
+  const handleSearch = async () => {
+    setPage(0)
+    loadMedia(true)
+  }
+
+  const handleMediaTypeChange = (type: 'all' | 'photo' | 'video') => {
+    setMediaType(type)
+    setPage(0)
+    loadMedia(true)
+  }
+
+  // Infinite scroll with Intersection Observer
+  const handleObserver = useCallback((entries: IntersectionObserverEntry[]) => {
+    const target = entries[0]
+    if (target.isIntersecting && hasMore && !loadingMore && !loading) {
+      setPage(prev => prev + 1)
+    }
+  }, [hasMore, loadingMore, loading])
+
   useEffect(() => {
-    loadMedia()
-  }, [mediaType])
+    if (hasMore && !loading) {
+      loadMedia(false)
+    }
+  }, [page])
+
+  useEffect(() => {
+    if (loadMoreRef.current) {
+      observerRef.current = new IntersectionObserver(handleObserver, {
+        root: null,
+        rootMargin: '100px',
+        threshold: 0
+      })
+      observerRef.current.observe(loadMoreRef.current)
+    }
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect()
+      }
+    }
+  }, [hasMore, loading, handleObserver])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
     window.location.href = '/'
+  }
+
+  const handleImageLoad = (id: string) => {
+    setLoadedImages(prev => new Set(prev).add(id))
   }
 
   if (pageLoading) return (
@@ -234,7 +300,7 @@ export default function BrowsePage() {
             {/* Media Type Filter */}
             <div className="flex gap-2">
               <button
-                onClick={() => setMediaType('all')}
+                onClick={() => handleMediaTypeChange('all')}
                 className={`px-4 py-3 rounded-xl font-medium transition-all ${
                   mediaType === 'all' 
                     ? 'bg-blue-600 text-white' 
@@ -244,7 +310,7 @@ export default function BrowsePage() {
                 All
               </button>
               <button
-                onClick={() => setMediaType('photo')}
+                onClick={() => handleMediaTypeChange('photo')}
                 className={`flex items-center gap-2 px-4 py-3 rounded-xl font-medium transition-all ${
                   mediaType === 'photo' 
                     ? 'bg-blue-600 text-white' 
@@ -255,7 +321,7 @@ export default function BrowsePage() {
                 Photos
               </button>
               <button
-                onClick={() => setMediaType('video')}
+                onClick={() => handleMediaTypeChange('video')}
                 className={`flex items-center gap-2 px-4 py-3 rounded-xl font-medium transition-all ${
                   mediaType === 'video' 
                     ? 'bg-blue-600 text-white' 
@@ -300,7 +366,7 @@ export default function BrowsePage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex justify-between items-center mb-6">
           <p className="text-gray-600 dark:text-gray-400">
-            {media.length} items found
+            {loading ? 'Loading...' : `${media.length}${hasMore ? '+' : ''} of ${totalCount} items`}
           </p>
           <select className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#2A2A2A] text-gray-700 dark:text-gray-300 text-sm">
             <option>Newest First</option>
@@ -311,9 +377,13 @@ export default function BrowsePage() {
         </div>
         
         {loading ? (
-          <div className="text-center py-20">
-            <div className="inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
-            <p className="mt-4 text-gray-500 dark:text-gray-400">Loading media...</p>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {[...Array(12)].map((_, i) => (
+              <div key={i} className="animate-pulse">
+                <div className="bg-gray-200 dark:bg-gray-700 rounded-lg aspect-square" />
+                <div className="mt-2 h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4" />
+              </div>
+            ))}
           </div>
         ) : media.length === 0 ? (
           <div className="text-center py-20">
@@ -330,12 +400,20 @@ export default function BrowsePage() {
               <div key={item.id} className="masonry-item group">
                 <div className="bg-white dark:bg-[#1E1E1E] hover:shadow-xl transition-all">
                   <div className="relative bg-gray-100 dark:bg-gray-800">
+                    {/* Skeleton loader */}
+                    {!loadedImages.has(item.id) && (
+                      <div className="absolute inset-0 bg-gray-200 dark:bg-gray-700 animate-pulse flex items-center justify-center">
+                        <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
+                      </div>
+                    )}
                     {getPreviewUrl(item) ? (
                       <img 
                         src={getPreviewUrl(item)} 
                         alt={item.filename}
                         className="w-full h-auto object-cover"
                         loading="lazy"
+                        onLoad={() => handleImageLoad(item.id)}
+                        style={{ display: loadedImages.has(item.id) ? 'block' : 'none' }}
                       />
                     ) : (
                       <div className="aspect-[4/3] w-full flex items-center justify-center text-gray-400 text-4xl">
@@ -390,12 +468,20 @@ export default function BrowsePage() {
             {media.map((item) => (
               <div key={item.id} className="bg-white dark:bg-[#1E1E1E] hover:shadow-xl transition-all group">
                 <div className="aspect-square bg-gray-100 dark:bg-gray-800 relative">
+                  {/* Skeleton loader */}
+                  {!loadedImages.has(item.id) && (
+                    <div className="absolute inset-0 bg-gray-200 dark:bg-gray-700 animate-pulse flex items-center justify-center">
+                      <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
+                    </div>
+                  )}
                   {getPreviewUrl(item) ? (
                     <img 
                       src={getPreviewUrl(item)} 
                       alt={item.filename}
                       className="w-full h-full object-cover"
                       loading="lazy"
+                      onLoad={() => handleImageLoad(item.id)}
+                      style={{ display: loadedImages.has(item.id) ? 'block' : 'none' }}
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-400 text-4xl">
@@ -435,6 +521,19 @@ export default function BrowsePage() {
             ))}
           </div>
         )}
+
+        {/* Load More Trigger / Loading Indicator */}
+        <div ref={loadMoreRef} className="py-8 flex justify-center">
+          {loadingMore && (
+            <div className="flex items-center gap-3 text-gray-500 dark:text-gray-400">
+              <Loader2 className="w-6 h-6 animate-spin" />
+              <span>Loading more...</span>
+            </div>
+          )}
+          {!hasMore && media.length > 0 && (
+            <p className="text-gray-500 dark:text-gray-400">You've seen all {totalCount} items</p>
+          )}
+        </div>
       </main>
     </div>
   )
