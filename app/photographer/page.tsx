@@ -125,6 +125,7 @@ export default function PhotographerPortal() {
               <Link href="/photographer/upload" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Upload</Link>
               <Link href="/photographer/media" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">My Media</Link>
               <Link href="/photographer/earnings" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Earnings</Link>
+              <Link href="/photographer/settings" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Settings</Link>
               <ThemeToggle />
               <button onClick={handleLogout} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Logout</button>
             </nav>
@@ -134,11 +135,25 @@ export default function PhotographerPortal() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">
-            Welcome, {profile.full_name}
-          </h1>
-          <p className="text-gray-600">Photographer ID: {profile.photographer_id || 'Pending'}</p>
+        <div className="mb-8 flex items-center gap-4">
+          {/* Profile Avatar */}
+          <div className="w-16 h-16 rounded-full overflow-hidden bg-gradient-to-br from-blue-500 to-purple-600 flex-shrink-0">
+            {profile.avatar_url ? (
+              <img src={profile.avatar_url} alt={profile.full_name || 'Photographer'} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-2xl text-white font-bold">
+                {profile.full_name?.charAt(0).toUpperCase() || profile.email?.charAt(0).toUpperCase() || 'P'}
+              </div>
+            )}
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              Welcome, {profile.full_name || 'Photographer'}
+            </h1>
+            <p className="text-gray-500 dark:text-gray-400">
+              {profile.specialty ? `${profile.specialty} • ` : ''}ID: {profile.photographer_id || 'Pending'}
+            </p>
+          </div>
         </div>
 
         {/* Stats Cards */}

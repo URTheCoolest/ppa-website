@@ -6,12 +6,24 @@ import { createClient } from '@/lib/supabase/client'
 import ThemeToggle from '@/components/ThemeToggle'
 import { Search, Camera, Video, Users, Star, ArrowRight, User, LogOut, Settings } from 'lucide-react'
 
+interface Photographer {
+  id: string
+  full_name: string
+  avatar_url: string | null
+  specialty: string | null
+  bio: string | null
+  photographer_id: string | null
+  media_count: number
+}
+
 export default function HomePage() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [photographers, setPhotographers] = useState<Photographer[]>([])
 
   useEffect(() => {
     checkUser()
+    loadPhotographers()
   }, [])
 
   const checkUser = async () => {
@@ -32,6 +44,35 @@ export default function HomePage() {
     const supabase = createClient()
     await supabase.auth.signOut()
     window.location.href = '/'
+  }
+
+  const loadPhotographers = async () => {
+    const supabase = createClient()
+    
+    // Fetch approved photographers with their media counts
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select(`
+        id,
+        full_name,
+        avatar_url,
+        specialty,
+        bio,
+        photographer_id,
+        photographer_media:media(count)
+      `)
+      .eq('role', 'photographer')
+      .eq('is_approved', true)
+      .order('created_at', { ascending: false })
+      .limit(4)
+    
+    if (profiles) {
+      const photographersWithCounts = profiles.map(p => ({
+        ...p,
+        media_count: p.photographer_media?.[0]?.count || 0
+      }))
+      setPhotographers(photographersWithCounts)
+    }
   }
 
   return (
@@ -415,85 +456,62 @@ export default function HomePage() {
           </div>
 
           <div className="grid md:grid-cols-4 gap-6">
-            {/* Photographer 1 */}
-            <div className="group bg-white dark:bg-[#2A2A2A] rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all">
-              <div className="aspect-square bg-gradient-to-br from-blue-400 to-purple-500 relative overflow-hidden">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-24 h-24 bg-white/20 rounded-full backdrop-blur-sm flex items-center justify-center">
-                    <span className="text-4xl text-white font-bold">AJ</span>
+            {photographers.length === 0 ? (
+              <>
+                {/* Placeholder when no photographers */}
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="group bg-white dark:bg-[#2A2A2A] rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all opacity-50">
+                    <div className="aspect-square bg-gradient-to-br from-gray-400 to-gray-500 relative overflow-hidden">
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-24 h-24 bg-white/20 rounded-full backdrop-blur-sm flex items-center justify-center">
+                          <Camera className="w-12 h-12 text-white" />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="p-4">
+                      <h3 className="font-bold dark:text-white">Join Our Team</h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Become a photographer</p>
+                    </div>
+                  </div>
+                ))}
+              </>
+            ) : (
+              photographers.map((photographer) => (
+                <div key={photographer.id} className="group bg-white dark:bg-[#2A2A2A] rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all">
+                  <div className="aspect-square bg-gradient-to-br from-blue-500 to-purple-600 relative overflow-hidden">
+                    {photographer.avatar_url ? (
+                      <img 
+                        src={photographer.avatar_url} 
+                        alt={photographer.full_name || 'Photographer'}
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-24 h-24 bg-white/20 rounded-full backdrop-blur-sm flex items-center justify-center">
+                          <span className="text-4xl text-white font-bold">
+                            {photographer.full_name?.charAt(0).toUpperCase() || 'P'}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-4">
+                    <h3 className="font-bold dark:text-white truncate">
+                      {photographer.full_name || photographer.photographer_id || 'Photographer'}
+                    </h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                      {photographer.specialty || 'General Photography'}
+                    </p>
+                    <div className="flex items-center gap-1 mt-2">
+                      <Camera className="w-4 h-4 text-gray-400" />
+                      <span className="text-sm text-gray-400">
+                        {photographer.media_count} {photographer.media_count === 1 ? 'photo' : 'photos'}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="p-4">
-                <h3 className="font-bold dark:text-white">Alex Johnson</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Landscape & Nature</p>
-                <div className="flex items-center gap-1 mt-2">
-                  <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                  <span className="text-sm font-medium dark:text-white">4.9</span>
-                  <span className="text-sm text-gray-400">(127 photos)</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Photographer 2 */}
-            <div className="group bg-white dark:bg-[#2A2A2A] rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all">
-              <div className="aspect-square bg-gradient-to-br from-orange-400 to-red-500 relative overflow-hidden">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-24 h-24 bg-white/20 rounded-full backdrop-blur-sm flex items-center justify-center">
-                    <span className="text-4xl text-white font-bold">SM</span>
-                  </div>
-                </div>
-              </div>
-              <div className="p-4">
-                <h3 className="font-bold dark:text-white">Sarah Miller</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Portrait & Lifestyle</p>
-                <div className="flex items-center gap-1 mt-2">
-                  <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                  <span className="text-sm font-medium dark:text-white">4.8</span>
-                  <span className="text-sm text-gray-400">(89 photos)</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Photographer 3 */}
-            <div className="group bg-white dark:bg-[#2A2A2A] rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all">
-              <div className="aspect-square bg-gradient-to-br from-green-400 to-teal-500 relative overflow-hidden">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-24 h-24 bg-white/20 rounded-full backdrop-blur-sm flex items-center justify-center">
-                    <span className="text-4xl text-white font-bold">MC</span>
-                  </div>
-                </div>
-              </div>
-              <div className="p-4">
-                <h3 className="font-bold dark:text-white">Mike Chen</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Business & Corporate</p>
-                <div className="flex items-center gap-1 mt-2">
-                  <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                  <span className="text-sm font-medium dark:text-white">4.7</span>
-                  <span className="text-sm text-gray-400">(156 photos)</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Photographer 4 */}
-            <div className="group bg-white dark:bg-[#2A2A2A] rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all">
-              <div className="aspect-square bg-gradient-to-br from-pink-400 to-rose-500 relative overflow-hidden">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-24 h-24 bg-white/20 rounded-full backdrop-blur-sm flex items-center justify-center">
-                    <span className="text-4xl text-white font-bold">EW</span>
-                  </div>
-                </div>
-              </div>
-              <div className="p-4">
-                <h3 className="font-bold dark:text-white">Emma Wilson</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Events & Weddings</p>
-                <div className="flex items-center gap-1 mt-2">
-                  <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                  <span className="text-sm font-medium dark:text-white">4.9</span>
-                  <span className="text-sm text-gray-400">(203 photos)</span>
-                </div>
-              </div>
-            </div>
+              ))
+            )}
           </div>
 
           <div className="mt-8 text-center md:hidden">
