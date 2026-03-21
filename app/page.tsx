@@ -16,14 +16,30 @@ interface Photographer {
   media_count: number
 }
 
+interface Stats {
+  mediaCount: number
+  photographerCount: number
+  clientCount: number
+}
+
+function formatCount(num: number, singular: string, plural: string): string {
+  if (num === 0) return `0 ${plural}`
+  if (num === 1) return `1 ${singular}`
+  if (num >= 1000) return `${Math.floor(num / 1000)}K+ ${plural}`
+  return `${num}+ ${plural}`
+}
+
 export default function HomePage() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [photographers, setPhotographers] = useState<Photographer[]>([])
+  const [stats, setStats] = useState<Stats>({ mediaCount: 0, photographerCount: 0, clientCount: 0 })
+  const [statsLoading, setStatsLoading] = useState(true)
 
   useEffect(() => {
     checkUser()
     loadPhotographers()
+    loadStats()
   }, [])
 
   const checkUser = async () => {
@@ -72,6 +88,29 @@ export default function HomePage() {
         media_count: p.photographer_media?.[0]?.count || 0
       }))
       setPhotographers(photographersWithCounts)
+    }
+  }
+
+  const loadStats = async () => {
+    const supabase = createClient()
+    
+    try {
+      // Get counts in parallel
+      const [mediaRes, photographerRes, clientRes] = await Promise.all([
+        supabase.from('media').select('id', { count: 'exact', head: true }).eq('is_approved', true),
+        supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'photographer').eq('is_approved', true),
+        supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'client')
+      ])
+      
+      setStats({
+        mediaCount: mediaRes.count || 0,
+        photographerCount: photographerRes.count || 0,
+        clientCount: clientRes.count || 0
+      })
+    } catch (error) {
+      console.error('Error loading stats:', error)
+    } finally {
+      setStatsLoading(false)
     }
   }
 
@@ -249,11 +288,27 @@ export default function HomePage() {
           {/* Stats */}
           <div className="mt-16 grid grid-cols-3 gap-8 max-w-xl mx-auto">
             <div>
-              <div className="text-3xl font-bold text-white">10K+</div>
+              <div className="text-3xl font-bold text-white">
+                {statsLoading ? (
+                  <span className="opacity-50">--</span>
+                ) : stats.mediaCount >= 1000 ? (
+                  `${Math.floor(stats.mediaCount / 1000)}K+`
+                ) : (
+                  `${stats.mediaCount}+`
+                )}
+              </div>
               <div className="text-sm text-gray-300">Photos & Videos</div>
             </div>
             <div>
-              <div className="text-3xl font-bold text-white">500+</div>
+              <div className="text-3xl font-bold text-white">
+                {statsLoading ? (
+                  <span className="opacity-50">--</span>
+                ) : stats.photographerCount >= 1000 ? (
+                  `${Math.floor(stats.photographerCount / 1000)}K+`
+                ) : (
+                  `${stats.photographerCount}+`
+                )}
+              </div>
               <div className="text-sm text-gray-300">Photographers</div>
             </div>
             <div>

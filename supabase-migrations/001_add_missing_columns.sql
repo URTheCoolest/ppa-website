@@ -10,6 +10,12 @@ ALTER TABLE media ADD COLUMN IF NOT EXISTS location TEXT;
 -- 2. Add specialty column to profiles table
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS specialty TEXT;
 
+-- 3. Add is_approved column to profiles table (default true for existing users)
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_approved BOOLEAN DEFAULT true;
+
+-- 4. Set is_approved = true for all existing profiles (so they can log in)
+UPDATE profiles SET is_approved = true WHERE is_approved IS NULL;
+
 -- 3. Verify the columns were added
 DO $$
 BEGIN
