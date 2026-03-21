@@ -21,11 +21,6 @@ interface Media {
   created_at: string
 }
 
-interface LoadedImage {
-  id: string
-  loaded: boolean
-}
-
 // Helper to get preview image URL (watermarked, smaller)
 function getPreviewUrl(item: Media): string {
   if (!item.file_path) return ''
@@ -61,9 +56,6 @@ export default function BrowsePage() {
   const [page, setPage] = useState(0)
   const [hasMore, setHasMore] = useState(true)
   const [totalCount, setTotalCount] = useState(0)
-  
-  // Image loading states
-  const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set())
   
   const observerRef = useRef<IntersectionObserver | null>(null)
   const loadMoreRef = useRef<HTMLDivElement>(null)
@@ -177,10 +169,6 @@ export default function BrowsePage() {
   const handleLogout = async () => {
     await supabase.auth.signOut()
     window.location.href = '/'
-  }
-
-  const handleImageLoad = (id: string) => {
-    setLoadedImages(prev => new Set(prev).add(id))
   }
 
   if (pageLoading) return (
@@ -377,13 +365,9 @@ export default function BrowsePage() {
         </div>
         
         {loading ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {[...Array(12)].map((_, i) => (
-              <div key={i} className="animate-pulse">
-                <div className="bg-gray-200 dark:bg-gray-700 rounded-lg aspect-square" />
-                <div className="mt-2 h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4" />
-              </div>
-            ))}
+          <div className="flex flex-col items-center justify-center py-20">
+            <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
+            <p className="text-gray-500 dark:text-gray-400">Loading media...</p>
           </div>
         ) : media.length === 0 ? (
           <div className="text-center py-20">
@@ -400,20 +384,12 @@ export default function BrowsePage() {
               <div key={item.id} className="masonry-item group">
                 <div className="bg-white dark:bg-[#1E1E1E] hover:shadow-xl transition-all">
                   <div className="relative bg-gray-100 dark:bg-gray-800">
-                    {/* Skeleton loader */}
-                    {!loadedImages.has(item.id) && (
-                      <div className="absolute inset-0 bg-gray-200 dark:bg-gray-700 animate-pulse flex items-center justify-center">
-                        <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
-                      </div>
-                    )}
                     {getPreviewUrl(item) ? (
                       <img 
                         src={getPreviewUrl(item)} 
                         alt={item.filename}
                         className="w-full h-auto object-cover"
                         loading="lazy"
-                        onLoad={() => handleImageLoad(item.id)}
-                        style={{ display: loadedImages.has(item.id) ? 'block' : 'none' }}
                       />
                     ) : (
                       <div className="aspect-[4/3] w-full flex items-center justify-center text-gray-400 text-4xl">
@@ -468,20 +444,12 @@ export default function BrowsePage() {
             {media.map((item) => (
               <div key={item.id} className="bg-white dark:bg-[#1E1E1E] hover:shadow-xl transition-all group">
                 <div className="aspect-square bg-gray-100 dark:bg-gray-800 relative">
-                  {/* Skeleton loader */}
-                  {!loadedImages.has(item.id) && (
-                    <div className="absolute inset-0 bg-gray-200 dark:bg-gray-700 animate-pulse flex items-center justify-center">
-                      <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
-                    </div>
-                  )}
                   {getPreviewUrl(item) ? (
                     <img 
                       src={getPreviewUrl(item)} 
                       alt={item.filename}
                       className="w-full h-full object-cover"
                       loading="lazy"
-                      onLoad={() => handleImageLoad(item.id)}
-                      style={{ display: loadedImages.has(item.id) ? 'block' : 'none' }}
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-400 text-4xl">
@@ -525,8 +493,8 @@ export default function BrowsePage() {
         {/* Load More Trigger / Loading Indicator */}
         <div ref={loadMoreRef} className="py-8 flex justify-center">
           {loadingMore && (
-            <div className="flex items-center gap-3 text-gray-500 dark:text-gray-400">
-              <Loader2 className="w-6 h-6 animate-spin" />
+            <div className="flex flex-col items-center gap-3 text-gray-500 dark:text-gray-400">
+              <Loader2 className="w-8 h-8 animate-spin" />
               <span>Loading more...</span>
             </div>
           )}
