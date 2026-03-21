@@ -7,6 +7,29 @@ const B2_APP_KEY = process.env.BACKBLAZE_APP_KEY!
 const B2_BUCKET_ID = process.env.BACKBLAZE_BUCKET_ID!
 const B2_BUCKET_NAME = process.env.BACKBLAZE_BUCKET_NAME!
 
+// Track if columns exist (cache for performance)
+let columnsChecked = false
+let hasLocation = false
+
+async function checkColumns(supabase: any) {
+  if (columnsChecked) return
+  
+  try {
+    const { data } = await supabase
+      .from('media')
+      .select('*')
+      .limit(1)
+    
+    if (data && data.length > 0) {
+      hasLocation = 'location' in data[0]
+    }
+  } catch (e) {
+    console.error('Error checking columns:', e)
+  }
+  
+  columnsChecked = true
+}
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData()
@@ -70,6 +93,9 @@ export async function POST(req: NextRequest) {
 
     // Save to Supabase database
     const supabase = createAdminClient()
+    
+    // Check if columns exist
+    await checkColumns(supabase)
 
     // Check if photographer has auto-approve enabled
     const { data: photographer } = await supabase
@@ -78,36 +104,59 @@ export async function POST(req: NextRequest) {
       .eq('id', photographerId)
       .single()
 
-    const autoApprove = photographer?.auto_approve_enabled ?? true // Default to true for auto-approve
+    const autoApprove = photographer?.auto_approve_enabled ?? true
+
+    // Build insert object based on available columns
+    const insertData: any = {
+      photographer_id: photographerId,
+      folder_id: folderId,
+      media_id: mediaId,
+      filename: filename || mediaId,
+      media_type: mediaType,
+      file_path: downloadUrl,
+      description: description,
+      shooting_date: shootingDate,
+      category: category,
+      keywords: keywords,
+      is_approved: autoApprove,
+      price_pln: mediaType === 'photo' ? 20 : 50
+    }
+
+    // Only add location if the column exists
+    if (hasLocation && location) {
+      insertData.location = location
+    }
 
     const { error: mediaError } = await supabase
       .from('media')
-      .insert({
-        photographer_id: photographerId,
-        folder_id: folderId,
-        media_id: mediaId,
-        filename: filename || mediaId,
-        media_type: mediaType,
-        file_path: downloadUrl,
-        description: description,
-        shooting_date: shootingDate,
-        category: category,
-        location: location,
-        keywords: keywords,
-        is_approved: autoApprove, // Auto-approve by default
-        price_pln: mediaType === 'photo' ? 20 : 50
-      })
+      .insert(insertData)
 
     if (mediaError) {
       console.error('Database error:', mediaError)
-      return NextResponse.json({ error: mediaError.message }, { status: 500 })
+      
+      // If error is about missing column, try without it
+      if (mediaError.message.includes('location')) {
+        hasLocation = false
+        delete insertData.location
+        
+        const { error: retryError } = await supabase
+          .from('media')
+          .insert(insertData)
+        
+        if (retryError) {
+          return NextResponse.json({ error: retryError.message }, { status: 500 })
+        }
+      } else {
+        return NextResponse.json({ error: mediaError.message }, { status: 500 })
+      }
     }
 
     return NextResponse.json({ 
       success: true, 
       filePath: b2FileName,
       mediaId,
-      approved: autoApprove
+      approved: autoApprove,
+      hasLocation
     })
 
   } catch (error: any) {
