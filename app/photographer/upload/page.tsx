@@ -17,6 +17,7 @@ interface MediaFile {
   category: string
   location: string
   keywords: string
+  progress?: number  // Upload progress 0-100
 }
 
 const CATEGORIES = [
@@ -53,6 +54,42 @@ export default function UploadPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
   const router = useRouter()
+
+  // Helper: Update file progress
+  const updateFileProgress = (fileId: string, progress: number) => {
+    setFiles(prev => prev.map(f => f.id === fileId ? { ...f, progress } : f))
+  }
+
+  // Helper: Upload with progress using XHR (for large files)
+  const uploadWithProgress = (fileId: string, url: string, file: File, contentType: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+          const percent = Math.round((e.loaded / e.total) * 100)
+          updateFileProgress(fileId, percent)
+        }
+      })
+      
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          updateFileProgress(fileId, 100)
+          resolve()
+        } else {
+          reject(new Error(`Upload failed (${xhr.status})`))
+        }
+      })
+      
+      xhr.addEventListener('error', () => {
+        reject(new Error('Upload failed'))
+      })
+      
+      xhr.open('PUT', url)
+      xhr.setRequestHeader('Content-Type', contentType)
+      xhr.send(file)
+    })
+  }
 
   useEffect(() => {
     checkUser()
@@ -226,19 +263,9 @@ export default function UploadPage() {
           const urlData = await urlResponse.json()
           if (urlData.error) throw new Error(urlData.error)
           
-          // Step 2: Upload directly to Backblaze using PUT
-          const uploadResponse = await fetch(urlData.uploadUrl, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': mediaFile.file.type,
-            },
-            body: mediaFile.file
-          })
-          
-          if (!uploadResponse.ok) {
-            const errorText = await uploadResponse.text()
-            throw new Error(`Upload failed (${uploadResponse.status}): ${errorText}`)
-          }
+          // Step 2: Upload directly to Backblaze using XHR (for progress tracking)
+          updateFileProgress(mediaFile.id, 0)
+          await uploadWithProgress(mediaFile.id, urlData.uploadUrl, mediaFile.file, mediaFile.file.type)
           
           // Step 3: Save metadata to database
           const saveResponse = await fetch('/api/save-media', {
@@ -537,6 +564,22 @@ export default function UploadPage() {
                           className="p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-[#2A2A2A] dark:text-white text-sm"
                         />
                       </div>
+                      
+                      {/* Progress Bar */}
+                      {file.progress !== undefined && file.progress < 100 && (
+                        <div className="mt-2">
+                          <div className="flex justify-between text-xs text-gray-500 mb-1">
+                            <span>Uploading...</span>
+                            <span>{file.progress}%</span>
+                          </div>
+                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                            <div 
+                              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${file.progress}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
