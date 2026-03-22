@@ -7,7 +7,9 @@ export default function PrivacyPage() {
     <div className="min-h-screen bg-white">
       <header className="border-b">
         <div className="max-w-4xl mx-auto px-4 py-4">
-          <a href="/" className="text-2xl font-bold text-blue-600">PPA</a>
+          <a href="/" className="flex items-center gap-2">
+            <img src="/ppa-logo.png" alt="PPA Logo" className="h-8 w-auto" />
+          </a>
         </div>
       </header>
 

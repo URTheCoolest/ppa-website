@@ -126,9 +126,6 @@ export default function HomePage() {
             <div className="flex items-center">
               <Link href="/" className="flex items-center gap-2">
                 <img src="/ppa-logo.png" alt="PPA Logo" className="h-10 w-auto" />
-                <span className="text-xl font-bold text-gray-900 dark:text-white hidden sm:block">
-                  People Press Agency
-                </span>
               </Link>
             </div>
 
@@ -729,10 +726,9 @@ export default function HomePage() {
             <div>
               <div className="flex items-center gap-2 mb-4">
                 <img src="/ppa-logo.png" alt="PPA Logo" className="h-10 w-auto" />
-                <span className="text-xl font-bold">PPA</span>
               </div>
               <p className="text-gray-400 text-sm">
-                People Press Agency - Premium Photo & Video Agency connecting talented photographers with media companies worldwide.
+                Premium Photo & Video Agency connecting talented photographers with media companies worldwide.
               </p>
             </div>
 

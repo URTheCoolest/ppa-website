@@ -9,8 +9,9 @@ export default function AboutPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <a href="/" className="text-2xl font-bold text-blue-600">PPA</a>
-              <span className="ml-2 text-sm text-gray-500">People Press Agency</span>
+              <a href="/" className="flex items-center gap-2">
+                <img src="/ppa-logo.png" alt="PPA Logo" className="h-8 w-auto" />
+              </a>
             </div>
             <nav className="flex items-center gap-4">
               <a href="/about" className="text-gray-600 hover:text-gray-900">About</a>
