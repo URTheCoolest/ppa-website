@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 
 // Backblaze B2 Configuration  
 const B2_KEY_ID = process.env.BACKBLAZE_KEY_ID || '00329dfb0600d150000000001'
@@ -6,47 +8,35 @@ const B2_APP_KEY = process.env.BACKBLAZE_APP_KEY || 'K003QYkZaYvX9VJxFv+Ee8EwKEC
 const B2_BUCKET_NAME = process.env.BACKBLAZE_BUCKET_NAME || 'ppa-media'
 const B2_BUCKET_ID = process.env.BACKBLAZE_BUCKET_ID || '1259bd4fab80f67090cd0115'
 
-// Watermark public URL
-const WATERMARK_URL = 'https://f003.backblazeb2.com/file/ppa-media/watermarks/PPA%20-%20Watermark%20-%20half%20scale.png'
-
 // Watermark version - change this to force cache busting
-const WATERMARK_VERSION = 'v7'
+const WATERMARK_VERSION = 'v8'
 
-// Cache watermark for 1 hour
+// Cache watermark in memory
 let watermarkCache: { buffer: Buffer; timestamp: number; version: string } | null = null
 const CACHE_TTL = 60 * 60 * 1000 // 1 hour
 
-async function getWatermarkBuffer(): Promise<Buffer | null> {
-  // Check cache first (only if same version)
+function getWatermarkBuffer(): Buffer | null {
+  // Check cache first
   if (watermarkCache && Date.now() - watermarkCache.timestamp < CACHE_TTL && watermarkCache.version === WATERMARK_VERSION) {
     console.log('WM: Using cached watermark')
     return watermarkCache.buffer
   }
 
   try {
-    console.log('WM: Downloading from:', WATERMARK_URL)
+    // Load from local public folder (served by Vercel)
+    const watermarkPath = join(process.cwd(), 'public', 'watermark-logo.png')
+    const buffer = readFileSync(watermarkPath)
     
-    const response = await fetch(WATERMARK_URL)
-    
-    if (!response.ok) {
-      console.log('WM: ✗ Download failed:', response.status, response.statusText)
-      return null
-    }
-    
-    const arrayBuffer = await response.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
-    
-    // Update cache
     watermarkCache = {
       buffer,
       timestamp: Date.now(),
       version: WATERMARK_VERSION
     }
     
-    console.log('WM: ✓ Loaded', buffer.length, 'bytes')
+    console.log('WM: ✓ Loaded local watermark:', buffer.length, 'bytes')
     return buffer
   } catch (e: any) {
-    console.log('WM: ✗ Error:', e.message)
+    console.log('WM: ✗ Failed to load local watermark:', e.message)
     return null
   }
 }
