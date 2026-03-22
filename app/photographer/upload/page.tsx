@@ -198,7 +198,7 @@ export default function UploadPage() {
         // For files >= 4MB, use presigned URL (direct upload to Backblaze)
         // This bypasses Vercel's 4.5MB body size limit
         if (fileSizeMB >= 4) {
-          // Step 1: Get presigned upload URL
+          // Step 1: Get presigned POST data
           const urlResponse = await fetch('/api/upload-url', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -214,21 +214,21 @@ export default function UploadPage() {
           const urlData = await urlResponse.json()
           if (urlData.error) throw new Error(urlData.error)
           
-          // Step 2: Upload directly to Backblaze
-          const uploadResponse = await fetch(urlData.uploadUrl, {
+          // Step 2: Upload directly to Backblaze S3 using FormData POST
+          const formData = new FormData()
+          Object.entries(urlData.fields).forEach(([key, value]) => {
+            formData.append(key, value as string)
+          })
+          formData.append('file', mediaFile.file)  // File must be last
+          
+          const uploadResponse = await fetch(urlData.url, {
             method: 'POST',
-            headers: {
-              'Authorization': urlData.authorizationToken,
-              'X-Bz-File-Name': encodeURIComponent(urlData.fileName),
-              'Content-Type': mediaFile.file.type,
-              'X-Bz-Content-Sha1': 'do_not_verify'
-            },
-            body: mediaFile.file
+            body: formData
           })
           
           if (!uploadResponse.ok) {
             const errorText = await uploadResponse.text()
-            throw new Error(`Backblaze upload failed: ${errorText}`)
+            throw new Error(`Upload failed: ${errorText}`)
           }
           
           // Step 3: Save metadata to database
@@ -236,7 +236,7 @@ export default function UploadPage() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              filePath: urlData.fileName,
+              filePath: urlData.key,
               photographerId: user.id,
               folderId: folderIdToUse || '',
               mediaId,
