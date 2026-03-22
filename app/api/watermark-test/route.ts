@@ -5,9 +5,10 @@ const WATERMARK_URL = 'https://f003.backblazeb2.com/file/ppa-media/watermarks/PP
 
 export async function GET() {
   try {
-    console.log('Downloading watermark from:', WATERMARK_URL)
+    console.log('TEST: Downloading watermark from:', WATERMARK_URL)
     
     const response = await fetch(WATERMARK_URL)
+    console.log('TEST: Response status:', response.status, response.statusText)
     
     if (!response.ok) {
       return NextResponse.json({ 
@@ -16,16 +17,17 @@ export async function GET() {
       }, { status: response.status })
     }
     
-    const buffer = await response.arrayBuffer()
+    const arrayBuffer = await response.arrayBuffer()
+    console.log('TEST: Downloaded bytes:', arrayBuffer.byteLength)
     
-    return new NextResponse(Buffer.from(buffer), {
+    return new NextResponse(Buffer.from(arrayBuffer), {
       headers: {
         'Content-Type': 'image/png',
         'Cache-Control': 'no-cache'
       }
     })
   } catch (e: any) {
-    console.error('Error:', e.message)
+    console.error('TEST Error:', e.message)
     return NextResponse.json({ 
       error: e.message 
     }, { status: 500 })
