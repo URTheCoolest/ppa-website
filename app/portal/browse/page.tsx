@@ -37,7 +37,7 @@ function getPreviewUrl(item: Media): string {
   
   const styles = ['diagonal', 'centered', 'tiled']
   const randomStyle = styles[Math.floor(Math.random() * styles.length)]
-  return `/api/preview?path=${encodeURIComponent(path)}&width=600&watermark=true&style=${randomStyle}`
+  return `/api/preview?path=${encodeURIComponent(path)}&width=600&watermark=true&style=${randomStyle}&v=v2`
 }
 
 const ITEMS_PER_PAGE = 12

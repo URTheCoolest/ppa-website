@@ -21,7 +21,7 @@ function getPreviewUrl(item: Media): string {
     path = path.split('/media/')[1]
   }
   
-  return `/api/preview?path=${encodeURIComponent(path)}&width=400&watermark=true&style=diagonal`
+  return `/api/preview?path=${encodeURIComponent(path)}&width=400&watermark=true&style=diagonal&v=v2`
 }
 
 interface Media {

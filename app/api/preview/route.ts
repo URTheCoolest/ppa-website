@@ -9,13 +9,16 @@ const B2_BUCKET_ID = process.env.BACKBLAZE_BUCKET_ID || '1259bd4fab80f67090cd011
 // Watermark file path in Backblaze
 const WATERMARK_PATH = 'watermarks/PPA - Watermark - half scale.png'
 
+// Watermark version - change this to force cache busting
+const WATERMARK_VERSION = 'v2'
+
 // Cache watermark for 1 hour
-let watermarkCache: { buffer: Buffer; timestamp: number } | null = null
+let watermarkCache: { buffer: Buffer; timestamp: number; version: string } | null = null
 const CACHE_TTL = 60 * 60 * 1000 // 1 hour
 
 async function getWatermarkBuffer(): Promise<Buffer | null> {
-  // Check cache first
-  if (watermarkCache && Date.now() - watermarkCache.timestamp < CACHE_TTL) {
+  // Check cache first (only if same version)
+  if (watermarkCache && Date.now() - watermarkCache.timestamp < CACHE_TTL && watermarkCache.version === WATERMARK_VERSION) {
     return watermarkCache.buffer
   }
 
@@ -58,7 +61,8 @@ async function getWatermarkBuffer(): Promise<Buffer | null> {
     // Update cache
     watermarkCache = {
       buffer,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      version: WATERMARK_VERSION
     }
     
     console.log('Watermark loaded from Backblaze:', buffer.length, 'bytes')
