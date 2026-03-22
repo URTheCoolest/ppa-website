@@ -9,7 +9,7 @@ const B2_BUCKET_NAME = process.env.BACKBLAZE_BUCKET_NAME || 'ppa-media'
 const B2_BUCKET_ID = process.env.BACKBLAZE_BUCKET_ID || '1259bd4fab80f67090cd0115'
 
 // Watermark version - change this to force cache busting
-const WATERMARK_VERSION = 'v12'
+const WATERMARK_VERSION = 'v13'
 
 // Cache watermark in memory
 let watermarkCache: { buffer: Buffer; timestamp: number; version: string } | null = null
@@ -123,8 +123,8 @@ export async function GET(req: NextRequest) {
       console.log('WM: Buffer size:', watermarkBuffer.length, 'bytes')
       console.log('WM: Final image size:', finalWidth, 'x', finalHeight)
       
-      // Resize logo - 50% of image width
-      const wmWidth = Math.floor(finalWidth * 0.50)
+      // Resize logo - 100% of image width
+      const wmWidth = Math.floor(finalWidth * 1.0)
       console.log('WM: Target width:', wmWidth)
       
       // Resize watermark and ensure it has proper alpha channel
