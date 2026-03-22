@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// Watermark public URL (accessible without auth)
+// Backblaze B2 Configuration  
+const B2_KEY_ID = process.env.BACKBLAZE_KEY_ID || '00329dfb0600d150000000001'
+const B2_APP_KEY = process.env.BACKBLAZE_APP_KEY || 'K003QYkZaYvX9VJxFv+Ee8EwKEC+EJc'
+const B2_BUCKET_NAME = process.env.BACKBLAZE_BUCKET_NAME || 'ppa-media'
+const B2_BUCKET_ID = process.env.BACKBLAZE_BUCKET_ID || '1259bd4fab80f67090cd0115'
+
+// Watermark public URL
 const WATERMARK_URL = 'https://f003.backblazeb2.com/file/ppa-media/watermarks/PPA%20-%20Watermark%20-%20half%20scale.png'
 
 // Watermark version - change this to force cache busting
-const WATERMARK_VERSION = 'v6'
+const WATERMARK_VERSION = 'v7'
 
 // Cache watermark for 1 hour
 let watermarkCache: { buffer: Buffer; timestamp: number; version: string } | null = null
@@ -51,13 +57,12 @@ export async function GET(req: NextRequest) {
     const path = searchParams.get('path')
     const width = searchParams.get('width') || '800'
     const watermark = searchParams.get('watermark') !== 'false'
-    const watermarkStyle = searchParams.get('style') || 'centered' // centered, tiled, diagonal
 
     if (!path) {
       return NextResponse.json({ error: 'No path provided' }, { status: 400 })
     }
 
-    // Get watermark buffer (cached from Backblaze)
+    // Get watermark buffer (cached)
     const watermarkBuffer = watermark ? await getWatermarkBuffer() : null
 
     console.log('Preview request:', path, 'watermark:', watermark, 'hasLogo:', !!watermarkBuffer)
@@ -125,14 +130,11 @@ export async function GET(req: NextRequest) {
     // Add watermark if requested
     if (watermark && contentType.startsWith('image/') && watermarkBuffer) {
       console.log('=== WATERMARK PROCESSING ===')
-      console.log('Watermark style:', watermarkStyle)
       console.log('Logo buffer size:', watermarkBuffer.length)
       console.log('Final image size:', finalWidth, 'x', finalHeight)
       
-      // Resize logo - much smaller (5-15% of image width)
-      const wmWidth = watermarkStyle === 'centered' 
-        ? Math.floor(finalWidth * 0.2) 
-        : Math.floor(finalWidth * 0.08)
+      // Resize logo - 15% of image width
+      const wmWidth = Math.floor(finalWidth * 0.15)
       console.log('Target logo width:', wmWidth)
       
       const logoResized = await sharp(watermarkBuffer)
