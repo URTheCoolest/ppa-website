@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { readFileSync } from 'fs'
-import { join } from 'path'
 
 // Backblaze B2 Configuration  
 const B2_KEY_ID = process.env.BACKBLAZE_KEY_ID || '00329dfb0600d150000000001'
@@ -8,13 +6,67 @@ const B2_APP_KEY = process.env.BACKBLAZE_APP_KEY || 'K003QYkZaYvX9VJxFv+Ee8EwKEC
 const B2_BUCKET_NAME = process.env.BACKBLAZE_BUCKET_NAME || 'ppa-media'
 const B2_BUCKET_ID = process.env.BACKBLAZE_BUCKET_ID || '1259bd4fab80f67090cd0115'
 
-// Load watermark logo at startup
-let watermarkBuffer: Buffer | null = null
-try {
-  watermarkBuffer = readFileSync(join(process.cwd(), 'public', 'watermark-logo.png'))
-  console.log('Watermark loaded:', watermarkBuffer?.length, 'bytes')
-} catch (e: any) {
-  console.log('Failed to load watermark:', e.message)
+// Watermark file path in Backblaze
+const WATERMARK_PATH = 'watermarks/PPA - Watermark - half scale.png'
+
+// Cache watermark for 1 hour
+let watermarkCache: { buffer: Buffer; timestamp: number } | null = null
+const CACHE_TTL = 60 * 60 * 1000 // 1 hour
+
+async function getWatermarkBuffer(): Promise<Buffer | null> {
+  // Check cache first
+  if (watermarkCache && Date.now() - watermarkCache.timestamp < CACHE_TTL) {
+    return watermarkCache.buffer
+  }
+
+  try {
+    const B2 = require('backblaze-b2')
+    const b2 = new B2({
+      applicationKeyId: B2_KEY_ID,
+      applicationKey: B2_APP_KEY
+    })
+
+    await b2.authorize()
+
+    const listResponse = await b2.listFileNames({
+      bucketId: B2_BUCKET_ID,
+      prefix: WATERMARK_PATH,
+      maxFileCount: 1
+    })
+
+    if (!listResponse.data.files || listResponse.data.files.length === 0) {
+      console.log('Watermark file not found in Backblaze:', WATERMARK_PATH)
+      return null
+    }
+
+    const fileId = listResponse.data.files[0].fileId
+
+    const downloadResponse = await b2.downloadFileById({
+      fileId: fileId,
+      responseType: 'stream'
+    })
+
+    const stream = downloadResponse.data
+    const chunks: Buffer[] = []
+    
+    for await (const chunk of stream) {
+      chunks.push(Buffer.from(chunk))
+    }
+    
+    const buffer = Buffer.concat(chunks)
+    
+    // Update cache
+    watermarkCache = {
+      buffer,
+      timestamp: Date.now()
+    }
+    
+    console.log('Watermark loaded from Backblaze:', buffer.length, 'bytes')
+    return buffer
+  } catch (e: any) {
+    console.log('Failed to load watermark from Backblaze:', e.message)
+    return null
+  }
 }
 
 export async function GET(req: NextRequest) {
@@ -28,6 +80,9 @@ export async function GET(req: NextRequest) {
     if (!path) {
       return NextResponse.json({ error: 'No path provided' }, { status: 400 })
     }
+
+    // Get watermark buffer (cached from Backblaze)
+    const watermarkBuffer = watermark ? await getWatermarkBuffer() : null
 
     console.log('Preview request:', path, 'watermark:', watermark, 'hasLogo:', !!watermarkBuffer)
 
