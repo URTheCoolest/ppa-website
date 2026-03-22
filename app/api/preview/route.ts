@@ -174,113 +174,19 @@ export async function GET(req: NextRequest) {
       const logoH = logoMeta.height || wmWidth
       console.log('Logo actual:', logoW, 'x', logoH)
       
-      let img: ReturnType<typeof sharp>
+      // Place watermark in the CENTER of the image (single watermark)
+      const centerX = Math.floor((finalWidth - logoW) / 2)
+      const centerY = Math.floor((finalHeight - logoH) / 2)
       
-      if (watermarkStyle === 'centered') {
-        // Create dark background box for centered
-        const bgWidth = logoW + 30
-        const bgHeight = logoH + 30
-        const centerX = Math.floor((finalWidth - bgWidth) / 2)
-        const centerY = Math.floor((finalHeight - bgHeight) / 2)
-        
-        console.log('Background:', bgWidth, 'x', bgHeight, 'at', centerX, ',', centerY)
-        
-        const bgSvg = Buffer.from(`<svg width="${bgWidth}" height="${bgHeight}"><rect width="100%" height="100%" fill="black" opacity="0.5"/></svg>`)
-        
-        img = sharp(originalBuffer)
-          .resize(finalWidth, finalHeight, { fit: 'fill' })
-          .composite([{ input: bgSvg, top: centerY, left: centerX }])
-          .composite([{ input: logoResized, top: centerY + 15, left: centerX + 15 }])
-      } else if (watermarkStyle === 'diagonal') {
-        // Diagonal watermark - TWO directions: 45° and -45° for crosshatch effect
-        console.log('Creating diagonal watermark...')
-        
-        // Rotate logo 45 degrees for first direction
-        const logoRotated = await sharp(logoResized)
-          .rotate(45, { background: { r: 0, g: 0, b: 0, alpha: 0 } })
-          .toBuffer()
-        
-        // Rotate logo -45 degrees (315°) for opposite direction
-        const logoRotatedOpposite = await sharp(logoResized)
-          .rotate(-45, { background: { r: 0, g: 0, b: 0, alpha: 0 } })
-          .toBuffer()
-        
-        const rotatedMeta = await sharp(logoRotated).metadata()
-        const rotW = rotatedMeta.width || logoW
-        const rotH = rotatedMeta.height || logoH
-        
-        // Calculate spacing for diagonal pattern (more space between smaller logos)
-        const spacingX = Math.floor(rotW * 2.5)
-        const spacingY = Math.floor(rotH * 3.0)
-        const tilesX = Math.ceil(finalWidth / spacingX) + 2
-        const tilesY = Math.ceil(finalHeight / spacingY) + 2
-        
-        console.log('Rotated logo:', rotW, 'x', rotH)
-        console.log('Tiles:', tilesX, 'x', tilesY)
-        
-        const composites: any[] = []
-        
-        // Direction 1: 45° (forward slash /)
-        for (let y = -1; y < tilesY; y++) {
-          for (let x = -1; x < tilesX; x++) {
-            const offsetX = (y % 2) * Math.floor(spacingX / 2)
-            composites.push({
-              input: logoRotated,
-              top: y * spacingY + offsetX,
-              left: x * spacingX
-            })
-          }
-        }
-        
-        // Direction 2: -45° (backslash \) - offset down by half the row spacing
-        const rowOffset = Math.floor(spacingY * 0.5)
-        for (let y = -1; y < tilesY; y++) {
-          for (let x = -1; x < tilesX; x++) {
-            const offsetX = (y % 2) * Math.floor(spacingX / 2)
-            composites.push({
-              input: logoRotatedOpposite,
-              top: y * spacingY + rowOffset + offsetX,
-              left: x * spacingX
-            })
-          }
-        }
-        
-        console.log('Total diagonal composites:', composites.length)
-        
-        img = sharp(originalBuffer)
-          .resize(finalWidth, finalHeight, { fit: 'fill' })
-          .composite(composites)
-      } else {
-        // Tiled watermark - repeat across entire image
-        console.log('Creating tiled watermark...')
-        
-        // Calculate how many tiles needed (more spacing for smaller watermark)
-        const spacingX = Math.floor(logoW * 3)
-        const spacingY = Math.floor(logoH * 3)
-        const tilesX = Math.ceil(finalWidth / spacingX) + 1
-        const tilesY = Math.ceil(finalHeight / spacingY) + 1
-        
-        console.log('Tiles:', tilesX, 'x', tilesY, 'spacing:', spacingX, ',', spacingY)
-        
-        // Build composite operations array
-        const composites: any[] = []
-        
-        for (let y = 0; y < tilesY; y++) {
-          for (let x = 0; x < tilesX; x++) {
-            composites.push({
-              input: logoResized,
-              top: y * spacingY,
-              left: x * spacingX
-            })
-          }
-        }
-        
-        console.log('Total composites:', composites.length)
-        
-        img = sharp(originalBuffer)
-          .resize(finalWidth, finalHeight, { fit: 'fill' })
-          .composite(composites)
-      }
+      console.log('Watermark position:', centerX, ',', centerY)
+      
+      const img = sharp(originalBuffer)
+        .resize(finalWidth, finalHeight, { fit: 'fill' })
+        .composite([{ 
+          input: logoResized, 
+          top: centerY, 
+          left: centerX 
+        }])
       
       const result = await img.toBuffer()
       console.log('Result size:', result.length)
