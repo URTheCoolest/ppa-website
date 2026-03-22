@@ -157,10 +157,10 @@ export async function GET(req: NextRequest) {
       console.log('Logo buffer size:', watermarkBuffer.length)
       console.log('Final image size:', finalWidth, 'x', finalHeight)
       
-      // Resize logo to 15% of image width for tiling (larger for centered)
+      // Resize logo - much smaller (5-15% of image width)
       const wmWidth = watermarkStyle === 'centered' 
-        ? Math.floor(finalWidth * 0.4) 
-        : Math.floor(finalWidth * 0.18)
+        ? Math.floor(finalWidth * 0.2) 
+        : Math.floor(finalWidth * 0.08)
       console.log('Target logo width:', wmWidth)
       
       const logoResized = await sharp(watermarkBuffer)
@@ -178,19 +178,19 @@ export async function GET(req: NextRequest) {
       
       if (watermarkStyle === 'centered') {
         // Create dark background box for centered
-        const bgWidth = logoW + 40
-        const bgHeight = logoH + 40
+        const bgWidth = logoW + 30
+        const bgHeight = logoH + 30
         const centerX = Math.floor((finalWidth - bgWidth) / 2)
         const centerY = Math.floor((finalHeight - bgHeight) / 2)
         
         console.log('Background:', bgWidth, 'x', bgHeight, 'at', centerX, ',', centerY)
         
-        const bgSvg = Buffer.from(`<svg width="${bgWidth}" height="${bgHeight}"><rect width="100%" height="100%" fill="black" opacity="0.7"/></svg>`)
+        const bgSvg = Buffer.from(`<svg width="${bgWidth}" height="${bgHeight}"><rect width="100%" height="100%" fill="black" opacity="0.5"/></svg>`)
         
         img = sharp(originalBuffer)
           .resize(finalWidth, finalHeight, { fit: 'fill' })
           .composite([{ input: bgSvg, top: centerY, left: centerX }])
-          .composite([{ input: logoResized, top: centerY + 20, left: centerX + 20 }])
+          .composite([{ input: logoResized, top: centerY + 15, left: centerX + 15 }])
       } else if (watermarkStyle === 'diagonal') {
         // Diagonal watermark - TWO directions: 45° and -45° for crosshatch effect
         console.log('Creating diagonal watermark...')
@@ -209,9 +209,9 @@ export async function GET(req: NextRequest) {
         const rotW = rotatedMeta.width || logoW
         const rotH = rotatedMeta.height || logoH
         
-        // Calculate spacing for diagonal pattern
-        const spacingX = Math.floor(rotW * 1.0)
-        const spacingY = Math.floor(rotH * 2.0)
+        // Calculate spacing for diagonal pattern (more space between smaller logos)
+        const spacingX = Math.floor(rotW * 2.5)
+        const spacingY = Math.floor(rotH * 3.0)
         const tilesX = Math.ceil(finalWidth / spacingX) + 2
         const tilesY = Math.ceil(finalHeight / spacingY) + 2
         
@@ -254,9 +254,9 @@ export async function GET(req: NextRequest) {
         // Tiled watermark - repeat across entire image
         console.log('Creating tiled watermark...')
         
-        // Calculate how many tiles needed
-        const spacingX = Math.floor(logoW * 1.5)
-        const spacingY = Math.floor(logoH * 1.5)
+        // Calculate how many tiles needed (more spacing for smaller watermark)
+        const spacingX = Math.floor(logoW * 3)
+        const spacingY = Math.floor(logoH * 3)
         const tilesX = Math.ceil(finalWidth / spacingX) + 1
         const tilesY = Math.ceil(finalHeight / spacingY) + 1
         
