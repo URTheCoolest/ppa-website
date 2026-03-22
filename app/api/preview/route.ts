@@ -9,7 +9,7 @@ const B2_BUCKET_NAME = process.env.BACKBLAZE_BUCKET_NAME || 'ppa-media'
 const B2_BUCKET_ID = process.env.BACKBLAZE_BUCKET_ID || '1259bd4fab80f67090cd0115'
 
 // Watermark version - change this to force cache busting
-const WATERMARK_VERSION = 'v8'
+const WATERMARK_VERSION = 'v9'
 
 // Cache watermark in memory
 let watermarkCache: { buffer: Buffer; timestamp: number; version: string } | null = null
@@ -127,39 +127,71 @@ export async function GET(req: NextRequest) {
       const wmWidth = Math.floor(finalWidth * 0.15)
       console.log('WM: Target width:', wmWidth)
       
+      // CRITICAL: Convert to RGBA so sharp can composite PNG overlays properly
+      // PNG overlays require alpha channel to blend correctly
       const logoResized = await sharp(watermarkBuffer)
-        .resize(wmWidth, null, { fit: 'inside' })
+        .resize(wmWidth, null, { fit: 'inside', withoutEnlargement: true })
+        .ensureAlpha()           // Guarantee alpha channel exists
         .toBuffer()
       
-      const logoMeta = await sharp(logoResized).metadata()
-      const logoW = logoMeta.width || wmWidth
-      const logoH = logoMeta.height || wmWidth
-      console.log('WM: Logo resized to:', logoW, 'x', logoH)
+      // Get final logo dimensions
+      const logoMetaFinal = await sharp(logoResized).metadata()
+      const logoW = logoMetaFinal.width || wmWidth
+      const logoH = logoMetaFinal.height || wmWidth
+      console.log('WM: Logo resized to:', logoW, 'x', logoH, '(channels:', logoMetaFinal.channels, ')')
       
       // Place watermark in the CENTER of the image (single watermark)
       const centerX = Math.floor((finalWidth - logoW) / 2)
       const centerY = Math.floor((finalHeight - logoH) / 2)
       
-      console.log('WM: Centering at:', centerX, ',', centerY)
+      console.log('WM: Centering at X:', centerX, ', Y:', centerY)
+      console.log('WM: Logo input type:', typeof logoResized, 'size:', logoResized.length)
       
-      const img = sharp(originalBuffer)
-        .resize(finalWidth, finalHeight, { fit: 'fill' })
-        .composite([{ 
-          input: logoResized, 
-          top: centerY, 
-          left: centerX 
-        }])
-      
-      const result = await img.toBuffer()
-      console.log('Result size:', result.length)
-      console.log('=== DONE ===')
+      try {
+        // Step 1: Resize the base image first
+        console.log('WM: Step 1 - Resizing base image to', finalWidth, 'x', finalHeight)
+        const resizedBase = await sharp(originalBuffer)
+          .resize(finalWidth, finalHeight, { fit: 'fill' })
+          .toBuffer()
+        console.log('WM: Base resized OK, size:', resizedBase.length)
+        
+        // Step 2: Get base dimensions
+        const baseMeta = await sharp(resizedBase).metadata()
+        console.log('WM: Base meta - width:', baseMeta.width, 'height:', baseMeta.height, 'channels:', baseMeta.channels)
+        
+        // Step 3: Composite watermark onto base
+        console.log('WM: Step 2 - Compositing watermark...')
+        const result = await sharp(resizedBase)
+          .composite([{
+            input: logoResized,
+            top: centerY,
+            left: centerX
+          }])
+          .png()  // Force PNG output for transparency
+          .toBuffer()
+        
+        console.log('WM: Composite result size:', result.length)
+        console.log('=== DONE ===')
 
-      return new NextResponse(result, {
-        headers: {
-          'Content-Type': 'image/png',
-          'Cache-Control': 'no-cache'
-        }
-      })
+        return new NextResponse(result, {
+          headers: {
+            'Content-Type': 'image/png',
+            'Cache-Control': 'no-cache'
+          }
+        })
+      } catch (wmError: any) {
+        console.error('WM: ✗ Watermark processing failed:', wmError.message, wmError.stack)
+        // Fall through to no-watermark path
+        const fallback = await sharp(originalBuffer)
+          .resize(finalWidth, finalHeight, { fit: 'fill' })
+          .toBuffer()
+        return new NextResponse(fallback, {
+          headers: {
+            'Content-Type': 'image/png',
+            'Cache-Control': 'no-cache'
+          }
+        })
+      }
     } else {
       // No watermark - just resize
       let image = sharp(originalBuffer)
