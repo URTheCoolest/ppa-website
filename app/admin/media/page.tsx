@@ -271,9 +271,7 @@ export default function MediaPage() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-4">
               <Link href="/" className="flex items-center gap-2">
-                <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">P</span>
-                </div>
+                <img src="/ppa-logo.png" alt="PPA Logo" className="h-10 w-auto" />
               </Link>
               <span className="text-gray-500 dark:text-gray-400">|</span>
               <span className="text-gray-600 dark:text-gray-300">Manage Media</span>

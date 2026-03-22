@@ -125,9 +125,7 @@ export default function HomePage() {
             {/* Logo */}
             <div className="flex items-center">
               <Link href="/" className="flex items-center gap-2">
-                <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">P</span>
-                </div>
+                <img src="/ppa-logo.png" alt="PPA Logo" className="h-10 w-auto" />
                 <span className="text-xl font-bold text-gray-900 dark:text-white hidden sm:block">
                   People Press Agency
                 </span>
@@ -730,9 +728,7 @@ export default function HomePage() {
             {/* Brand */}
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">P</span>
-                </div>
+                <img src="/ppa-logo.png" alt="PPA Logo" className="h-10 w-auto" />
                 <span className="text-xl font-bold">PPA</span>
               </div>
               <p className="text-gray-400 text-sm">
