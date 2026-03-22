@@ -9,7 +9,7 @@ const B2_BUCKET_NAME = process.env.BACKBLAZE_BUCKET_NAME || 'ppa-media'
 const B2_BUCKET_ID = process.env.BACKBLAZE_BUCKET_ID || '1259bd4fab80f67090cd0115'
 
 // Watermark version - change this to force cache busting
-const WATERMARK_VERSION = 'v9'
+const WATERMARK_VERSION = 'v10'
 
 // Cache watermark in memory
 let watermarkCache: { buffer: Buffer; timestamp: number; version: string } | null = null
@@ -123,15 +123,14 @@ export async function GET(req: NextRequest) {
       console.log('WM: Buffer size:', watermarkBuffer.length, 'bytes')
       console.log('WM: Final image size:', finalWidth, 'x', finalHeight)
       
-      // Resize logo - 15% of image width
-      const wmWidth = Math.floor(finalWidth * 0.15)
+      // Resize logo - 25% of image width (more visible)
+      const wmWidth = Math.floor(finalWidth * 0.25)
       console.log('WM: Target width:', wmWidth)
       
-      // CRITICAL: Convert to RGBA so sharp can composite PNG overlays properly
-      // PNG overlays require alpha channel to blend correctly
+      // Resize watermark and ensure it has proper alpha channel
       const logoResized = await sharp(watermarkBuffer)
         .resize(wmWidth, null, { fit: 'inside', withoutEnlargement: true })
-        .ensureAlpha()           // Guarantee alpha channel exists
+        .png()  // Keep as PNG with alpha
         .toBuffer()
       
       // Get final logo dimensions
@@ -165,9 +164,10 @@ export async function GET(req: NextRequest) {
           .composite([{
             input: logoResized,
             top: centerY,
-            left: centerX
+            left: centerX,
+            blend: 'over'  // Proper alpha blending
           }])
-          .png()  // Force PNG output for transparency
+          .jpeg({ quality: 85 })  // Output as JPEG (much smaller for photos)
           .toBuffer()
         
         console.log('WM: Composite result size:', result.length)
@@ -175,7 +175,7 @@ export async function GET(req: NextRequest) {
 
         return new NextResponse(result, {
           headers: {
-            'Content-Type': 'image/png',
+            'Content-Type': 'image/jpeg',
             'Cache-Control': 'no-cache'
           }
         })
@@ -184,10 +184,11 @@ export async function GET(req: NextRequest) {
         // Fall through to no-watermark path
         const fallback = await sharp(originalBuffer)
           .resize(finalWidth, finalHeight, { fit: 'fill' })
+          .jpeg({ quality: 85 })
           .toBuffer()
         return new NextResponse(fallback, {
           headers: {
-            'Content-Type': 'image/png',
+            'Content-Type': 'image/jpeg',
             'Cache-Control': 'no-cache'
           }
         })
