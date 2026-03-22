@@ -193,26 +193,88 @@ export default function UploadPage() {
       for (let i = 0; i < files.length; i++) {
         const mediaFile = files[i]
         const mediaId = `PPA-MEDIA-${String(newCount + i).padStart(5, '0')}`
+        const fileSizeMB = mediaFile.file.size / (1024 * 1024)
         
-        const formData = new FormData()
-        formData.append('file', mediaFile.file)
-        formData.append('photographerId', user.id)
-        formData.append('folderId', folderIdToUse || '')
-        formData.append('mediaId', mediaId)
-        formData.append('filename', mediaFile.filename || '')
-        formData.append('description', mediaFile.description || '')
-        formData.append('shooting_date', mediaFile.shooting_date || '')
-        formData.append('category', mediaFile.category || '')
-        formData.append('location', mediaFile.location || '')
-        formData.append('keywords', mediaFile.keywords || '')
+        // For files >= 4MB, use presigned URL (direct upload to Backblaze)
+        // This bypasses Vercel's 4.5MB body size limit
+        if (fileSizeMB >= 4) {
+          // Step 1: Get presigned upload URL
+          const urlResponse = await fetch('/api/upload-url', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              filename: mediaFile.file.name,
+              contentType: mediaFile.file.type,
+              photographerId: user.id,
+              folderId: folderIdToUse || '',
+              mediaId
+            })
+          })
+          
+          const urlData = await urlResponse.json()
+          if (urlData.error) throw new Error(urlData.error)
+          
+          // Step 2: Upload directly to Backblaze
+          const uploadResponse = await fetch(urlData.uploadUrl, {
+            method: 'POST',
+            headers: {
+              'Authorization': urlData.authorizationToken,
+              'X-Bz-File-Name': encodeURIComponent(urlData.fileName),
+              'Content-Type': mediaFile.file.type,
+              'X-Bz-Content-Sha1': 'do_not_verify'
+            },
+            body: mediaFile.file
+          })
+          
+          if (!uploadResponse.ok) {
+            const errorText = await uploadResponse.text()
+            throw new Error(`Backblaze upload failed: ${errorText}`)
+          }
+          
+          // Step 3: Save metadata to database
+          const saveResponse = await fetch('/api/save-media', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              filePath: urlData.fileName,
+              photographerId: user.id,
+              folderId: folderIdToUse || '',
+              mediaId,
+              filename: mediaFile.filename || '',
+              contentType: mediaFile.file.type,
+              description: mediaFile.description || '',
+              shootingDate: mediaFile.shooting_date || '',
+              category: mediaFile.category || '',
+              location: mediaFile.location || '',
+              keywords: mediaFile.keywords || ''
+            })
+          })
+          
+          const saveResult = await saveResponse.json()
+          if (saveResult.error) throw new Error(saveResult.error)
+          
+        } else {
+          // Small files: use direct upload (existing method)
+          const formData = new FormData()
+          formData.append('file', mediaFile.file)
+          formData.append('photographerId', user.id)
+          formData.append('folderId', folderIdToUse || '')
+          formData.append('mediaId', mediaId)
+          formData.append('filename', mediaFile.filename || '')
+          formData.append('description', mediaFile.description || '')
+          formData.append('shooting_date', mediaFile.shooting_date || '')
+          formData.append('category', mediaFile.category || '')
+          formData.append('location', mediaFile.location || '')
+          formData.append('keywords', mediaFile.keywords || '')
 
-        const uploadResponse = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData
-        })
+          const uploadResponse = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData
+          })
 
-        const uploadResult = await uploadResponse.json()
-        if (uploadResult.error) throw new Error(uploadResult.error)
+          const uploadResult = await uploadResponse.json()
+          if (uploadResult.error) throw new Error(uploadResult.error)
+        }
       }
 
       setSuccess(true)

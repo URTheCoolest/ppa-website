@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
+// Route segment config for large file uploads
+export const maxDuration = 300  // 5 minutes for large uploads
+export const dynamic = 'force-dynamic'
+
 // Backblaze B2 Configuration
 const B2_KEY_ID = process.env.BACKBLAZE_KEY_ID!
 const B2_APP_KEY = process.env.BACKBLAZE_APP_KEY!
