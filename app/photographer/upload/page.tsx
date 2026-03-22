@@ -184,15 +184,25 @@ export default function UploadPage() {
         folderIdToUse = folder.id
       }
 
-      const { count } = await supabase
+      // Get the highest media_id number to avoid collisions
+      const { data: existingMedia } = await supabase
         .from('media')
-        .select('*', { count: 'exact', head: true })
+        .select('media_id')
+        .order('created_at', { ascending: false })
+        .limit(1)
 
-      const newCount = (count || 0) + 1
+      let nextNumber = 1
+      if (existingMedia && existingMedia.length > 0) {
+        const lastId = existingMedia[0].media_id
+        const match = lastId.match(/PPA-MEDIA-(\d+)/)
+        if (match) {
+          nextNumber = parseInt(match[1]) + 1
+        }
+      }
 
       for (let i = 0; i < files.length; i++) {
         const mediaFile = files[i]
-        const mediaId = `PPA-MEDIA-${String(newCount + i).padStart(5, '0')}`
+        const mediaId = `PPA-MEDIA-${String(nextNumber + i).padStart(5, '0')}`
         const fileSizeMB = mediaFile.file.size / (1024 * 1024)
         
         // For files >= 4MB, use presigned URL (direct upload to Backblaze)
