@@ -9,7 +9,7 @@ const B2_BUCKET_NAME = process.env.BACKBLAZE_BUCKET_NAME || 'ppa-media'
 const B2_BUCKET_ID = process.env.BACKBLAZE_BUCKET_ID || '1259bd4fab80f67090cd0115'
 
 // Watermark version - change this to force cache busting
-const WATERMARK_VERSION = 'v14'
+const WATERMARK_VERSION = 'v15'
 
 // Cache watermark in memory
 let watermarkCache: { buffer: Buffer; timestamp: number; version: string } | null = null
@@ -123,13 +123,15 @@ export async function GET(req: NextRequest) {
       console.log('WM: Buffer size:', watermarkBuffer.length, 'bytes')
       console.log('WM: Final image size:', finalWidth, 'x', finalHeight)
       
-      // Resize logo - 95% of image width
+      // Resize logo - 95% of image width, but also fit within height
       const wmWidth = Math.floor(finalWidth * 0.95)
-      console.log('WM: Target width:', wmWidth)
+      const wmMaxHeight = Math.floor(finalHeight * 0.95)
+      console.log('WM: Target width:', wmWidth, 'max height:', wmMaxHeight)
       
       // Resize watermark and ensure it has proper alpha channel
+      // fit: 'inside' ensures it stays within BOTH width and height bounds
       const logoResized = await sharp(watermarkBuffer)
-        .resize(wmWidth, null, { fit: 'inside', withoutEnlargement: true })
+        .resize(wmWidth, wmMaxHeight, { fit: 'inside', withoutEnlargement: true })
         .png()  // Keep as PNG with alpha
         .toBuffer()
       
