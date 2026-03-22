@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import ThemeToggle from '@/components/ThemeToggle'
+import Header from '@/components/Header'
 import { Search, Camera, Video, Grid, Layout, Lock, Loader2 } from 'lucide-react'
 
 interface Media {
@@ -48,9 +48,7 @@ export default function BrowsePage() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [mediaType, setMediaType] = useState<'all' | 'photo' | 'video'>('all')
-  const [user, setUser] = useState<any>(null)
   const [viewMode, setViewMode] = useState<'grid' | 'masonry'>('masonry')
-  const [pageLoading, setPageLoading] = useState(true)
   
   // Pagination
   const [page, setPage] = useState(0)
@@ -63,24 +61,8 @@ export default function BrowsePage() {
   const supabase = createClient()
 
   useEffect(() => {
-    checkUser()
-  }, [])
-
-  const checkUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (user) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-      setUser({ ...user, profile })
-    }
-    
-    setPageLoading(false)
     loadMedia(true)
-  }
+  }, [])
 
   const loadMedia = async (reset: boolean = false) => {
     if (reset) {
@@ -165,106 +147,9 @@ export default function BrowsePage() {
     }
   }, [hasMore, loading, handleObserver])
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    window.location.href = '/'
-  }
-
-  if (pageLoading) return (
-    <div className="min-h-screen bg-white dark:bg-[#121212] flex items-center justify-center">
-      <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
-    </div>
-  )
-
   return (
     <div className="min-h-screen bg-white dark:bg-[#121212]">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-white/95 dark:bg-[#121212]/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-4">
-              <Link href="/" className="flex items-center gap-2">
-                <img src="/ppa-logo.png" alt="PPA Logo" className="h-10 w-auto" />
-              </Link>
-              <span className="text-gray-500 dark:text-gray-400">|</span>
-              <span className="text-gray-900 dark:text-white font-medium">Browse Media</span>
-            </div>
-            <nav className="flex items-center gap-4">
-              {user && (
-                <>
-                  <Link href="/portal" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white text-sm font-medium">
-                    Dashboard
-                  </Link>
-                  <Link href="/portal/my-requests" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white text-sm font-medium">
-                    My Requests
-                  </Link>
-                </>
-              )}
-              <ThemeToggle />
-              
-              {/* Profile/Login Section */}
-              {user ? (
-                <div className="relative group">
-                  <button className="flex items-center gap-2">
-                    {user?.profile?.avatar_url ? (
-                      <img 
-                        src={user.profile.avatar_url} 
-                        alt="Profile" 
-                        className="w-9 h-9 rounded-full object-cover border-2 border-blue-500"
-                      />
-                    ) : (
-                      <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center border-2 border-blue-500">
-                        <span className="text-white font-medium text-sm">
-                          {user?.email?.charAt(0).toUpperCase() || 'U'}
-                        </span>
-                      </div>
-                    )}
-                  </button>
-                  
-                  {/* Dropdown Menu */}
-                  <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-[#1E1E1E] border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                    <div className="p-3 border-b border-gray-200 dark:border-gray-700">
-                      <p className="font-medium text-gray-900 dark:text-white text-sm truncate">
-                        {user?.profile?.full_name || user?.email?.split('@')[0]}
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                        {user?.email}
-                      </p>
-                    </div>
-                    <div className="p-2">
-                      <Link 
-                        href="/portal" 
-                        className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                      >
-                        Dashboard
-                      </Link>
-                      <Link 
-                        href="/portal/my-requests" 
-                        className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                      >
-                        My Requests
-                      </Link>
-                      <button 
-                        onClick={handleLogout}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                      >
-                        Logout
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <Link
-                  href="/login"
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                >
-                  Login
-                </Link>
-              )}
-            </nav>
-          </div>
-        </div>
-      </header>
+      <Header currentPage="browse" showNav={true} />
 
       {/* Search & Filters */}
       <div className="bg-gray-50 dark:bg-[#1E1E1E] py-6 border-b border-gray-200 dark:border-gray-800">
