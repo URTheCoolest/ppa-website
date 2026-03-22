@@ -19,17 +19,17 @@ const CACHE_TTL = 60 * 60 * 1000 // 1 hour
 async function getWatermarkBuffer(): Promise<Buffer | null> {
   // Check cache first (only if same version)
   if (watermarkCache && Date.now() - watermarkCache.timestamp < CACHE_TTL && watermarkCache.version === WATERMARK_VERSION) {
-    console.log('Using cached watermark')
+    console.log('WM: Using cached watermark')
     return watermarkCache.buffer
   }
 
   try {
-    console.log('Downloading watermark from public URL:', WATERMARK_URL)
+    console.log('WM: Downloading from:', WATERMARK_URL)
     
     const response = await fetch(WATERMARK_URL)
     
     if (!response.ok) {
-      console.log('✗ Failed to download watermark:', response.status, response.statusText)
+      console.log('WM: ✗ Download failed:', response.status, response.statusText)
       return null
     }
     
@@ -43,10 +43,10 @@ async function getWatermarkBuffer(): Promise<Buffer | null> {
       version: WATERMARK_VERSION
     }
     
-    console.log('✓ Watermark loaded:', buffer.length, 'bytes')
+    console.log('WM: ✓ Loaded', buffer.length, 'bytes')
     return buffer
   } catch (e: any) {
-    console.log('✗ Failed to load watermark:', e.message)
+    console.log('WM: ✗ Error:', e.message)
     return null
   }
 }
@@ -130,29 +130,27 @@ export async function GET(req: NextRequest) {
     // Add watermark if requested
     if (watermark && contentType.startsWith('image/') && watermarkBuffer) {
       console.log('=== WATERMARK PROCESSING ===')
-      console.log('Logo buffer size:', watermarkBuffer.length)
-      console.log('Final image size:', finalWidth, 'x', finalHeight)
+      console.log('WM: Buffer size:', watermarkBuffer.length, 'bytes')
+      console.log('WM: Final image size:', finalWidth, 'x', finalHeight)
       
       // Resize logo - 15% of image width
       const wmWidth = Math.floor(finalWidth * 0.15)
-      console.log('Target logo width:', wmWidth)
+      console.log('WM: Target width:', wmWidth)
       
       const logoResized = await sharp(watermarkBuffer)
         .resize(wmWidth, null, { fit: 'inside' })
         .toBuffer()
-      console.log('Resized logo:', logoResized.length)
       
-      // Get actual size
       const logoMeta = await sharp(logoResized).metadata()
       const logoW = logoMeta.width || wmWidth
       const logoH = logoMeta.height || wmWidth
-      console.log('Logo actual:', logoW, 'x', logoH)
+      console.log('WM: Logo resized to:', logoW, 'x', logoH)
       
       // Place watermark in the CENTER of the image (single watermark)
       const centerX = Math.floor((finalWidth - logoW) / 2)
       const centerY = Math.floor((finalHeight - logoH) / 2)
       
-      console.log('Watermark position:', centerX, ',', centerY)
+      console.log('WM: Centering at:', centerX, ',', centerY)
       
       const img = sharp(originalBuffer)
         .resize(finalWidth, finalHeight, { fit: 'fill' })
