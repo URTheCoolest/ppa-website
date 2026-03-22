@@ -6,19 +6,25 @@ const B2_APP_KEY = process.env.BACKBLAZE_APP_KEY || 'K003QYkZaYvX9VJxFv+Ee8EwKEC
 const B2_BUCKET_NAME = process.env.BACKBLAZE_BUCKET_NAME || 'ppa-media'
 const B2_BUCKET_ID = process.env.BACKBLAZE_BUCKET_ID || '1259bd4fab80f67090cd0115'
 
-// Watermark file path in Backblaze
-const WATERMARK_PATH = 'watermarks/PPA - Watermark - half scale.png'
+// Possible watermark paths to try
+const WATERMARK_PATHS = [
+  'watermarks/PPA - Watermark - half scale.png',
+  'watermarks/PPA-Watermark-half-scale.png',
+  'watermarks/watermark.png',
+  'PPA - Watermark - half scale.png',
+]
 
 // Watermark version - change this to force cache busting
-const WATERMARK_VERSION = 'v2'
+const WATERMARK_VERSION = 'v3'
 
 // Cache watermark for 1 hour
-let watermarkCache: { buffer: Buffer; timestamp: number; version: string } | null = null
+let watermarkCache: { buffer: Buffer; timestamp: number; version: string; path: string } | null = null
 const CACHE_TTL = 60 * 60 * 1000 // 1 hour
 
 async function getWatermarkBuffer(): Promise<Buffer | null> {
   // Check cache first (only if same version)
   if (watermarkCache && Date.now() - watermarkCache.timestamp < CACHE_TTL && watermarkCache.version === WATERMARK_VERSION) {
+    console.log('Using cached watermark, path:', watermarkCache.path)
     return watermarkCache.buffer
   }
 
@@ -31,44 +37,50 @@ async function getWatermarkBuffer(): Promise<Buffer | null> {
 
     await b2.authorize()
 
-    const listResponse = await b2.listFileNames({
-      bucketId: B2_BUCKET_ID,
-      prefix: WATERMARK_PATH,
-      maxFileCount: 1
-    })
+    // Try each path until we find the watermark
+    for (const wmPath of WATERMARK_PATHS) {
+      console.log('Trying watermark path:', wmPath)
+      
+      const listResponse = await b2.listFileNames({
+        bucketId: B2_BUCKET_ID,
+        prefix: wmPath,
+        maxFileCount: 1
+      })
 
-    if (!listResponse.data.files || listResponse.data.files.length === 0) {
-      console.log('Watermark file not found in Backblaze:', WATERMARK_PATH)
-      return null
+      if (listResponse.data.files && listResponse.data.files.length > 0) {
+        const fileId = listResponse.data.files[0].fileId
+
+        const downloadResponse = await b2.downloadFileById({
+          fileId: fileId,
+          responseType: 'stream'
+        })
+
+        const stream = downloadResponse.data
+        const chunks: Buffer[] = []
+        
+        for await (const chunk of stream) {
+          chunks.push(Buffer.from(chunk))
+        }
+        
+        const buffer = Buffer.concat(chunks)
+        
+        // Update cache
+        watermarkCache = {
+          buffer,
+          timestamp: Date.now(),
+          version: WATERMARK_VERSION,
+          path: wmPath
+        }
+        
+        console.log('✓ Watermark loaded from Backblaze:', wmPath, '-', buffer.length, 'bytes')
+        return buffer
+      }
     }
-
-    const fileId = listResponse.data.files[0].fileId
-
-    const downloadResponse = await b2.downloadFileById({
-      fileId: fileId,
-      responseType: 'stream'
-    })
-
-    const stream = downloadResponse.data
-    const chunks: Buffer[] = []
     
-    for await (const chunk of stream) {
-      chunks.push(Buffer.from(chunk))
-    }
-    
-    const buffer = Buffer.concat(chunks)
-    
-    // Update cache
-    watermarkCache = {
-      buffer,
-      timestamp: Date.now(),
-      version: WATERMARK_VERSION
-    }
-    
-    console.log('Watermark loaded from Backblaze:', buffer.length, 'bytes')
-    return buffer
+    console.log('✗ Watermark file not found in Backblaze (tried all paths)')
+    return null
   } catch (e: any) {
-    console.log('Failed to load watermark from Backblaze:', e.message)
+    console.log('✗ Failed to load watermark from Backblaze:', e.message)
     return null
   }
 }
