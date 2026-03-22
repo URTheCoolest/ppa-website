@@ -281,23 +281,13 @@ export default function BrowsePage() {
                     
                     {/* Hover Overlay */}
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
-                      {user ? (
-                        <Link
-                          href={`/portal/license/${item.id}`}
-                          className="bg-white text-gray-900 px-6 py-2 rounded-full font-medium transform translate-y-4 group-hover:translate-y-0 transition-all flex items-center gap-2"
-                        >
-                          <Lock className="w-4 h-4" />
-                          License This
-                        </Link>
-                      ) : (
-                        <Link
-                          href="/login"
-                          className="bg-blue-600 text-white px-6 py-2 rounded-full font-medium transform translate-y-4 group-hover:translate-y-0 transition-all flex items-center gap-2"
-                        >
-                          <Lock className="w-4 h-4" />
-                          Login to License
-                        </Link>
-                      )}
+                      <Link
+                        href={`/portal/license/${item.id}`}
+                        className="bg-white text-gray-900 px-6 py-2 rounded-full font-medium transform translate-y-4 group-hover:translate-y-0 transition-all flex items-center gap-2"
+                      >
+                        <Lock className="w-4 h-4" />
+                        License This
+                      </Link>
                     </div>
                     
                     {/* Media Type Badge */}
