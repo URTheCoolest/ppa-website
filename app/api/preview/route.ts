@@ -15,7 +15,7 @@ const WATERMARK_PATHS = [
 ]
 
 // Watermark version - change this to force cache busting
-const WATERMARK_VERSION = 'v3'
+const WATERMARK_VERSION = 'v4'
 
 // Cache watermark for 1 hour
 let watermarkCache: { buffer: Buffer; timestamp: number; version: string; path: string } | null = null

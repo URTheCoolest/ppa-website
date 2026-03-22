@@ -20,7 +20,7 @@ function getPreviewUrl(item: any): string {
     path = path.split('/media/')[1]
   }
   
-  return `/api/preview?path=${encodeURIComponent(path)}&width=400&watermark=true&style=diagonal&v=v2`
+  return `/api/preview?path=${encodeURIComponent(path)}&width=400&watermark=true&style=diagonal&v=v4`
 }
 
 export default function PhotographerPortal() {
