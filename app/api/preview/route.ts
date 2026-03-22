@@ -9,7 +9,7 @@ const B2_BUCKET_NAME = process.env.BACKBLAZE_BUCKET_NAME || 'ppa-media'
 const B2_BUCKET_ID = process.env.BACKBLAZE_BUCKET_ID || '1259bd4fab80f67090cd0115'
 
 // Watermark version - change this to force cache busting
-const WATERMARK_VERSION = 'v15'
+const WATERMARK_VERSION = 'v16'
 
 // Cache watermark in memory
 let watermarkCache: { buffer: Buffer; timestamp: number; version: string } | null = null
@@ -123,27 +123,23 @@ export async function GET(req: NextRequest) {
       console.log('WM: Buffer size:', watermarkBuffer.length, 'bytes')
       console.log('WM: Final image size:', finalWidth, 'x', finalHeight)
       
-      // Resize logo - 95% of image width, but also fit within height
-      const wmWidth = Math.floor(finalWidth * 0.95)
-      const wmMaxHeight = Math.floor(finalHeight * 0.95)
-      console.log('WM: Target width:', wmWidth, 'max height:', wmMaxHeight)
+      // Resize watermark to COVER the entire image
+      // - Horizontal images: watermark fills width, top/bottom gets clipped
+      // - Vertical images: watermark fills height, sides get clipped
+      // fit: 'cover' makes watermark exactly match image dimensions, cropping the watermark
+      console.log('WM: Covering image at', finalWidth, 'x', finalHeight)
       
-      // Resize watermark and ensure it has proper alpha channel
-      // fit: 'inside' ensures it stays within BOTH width and height bounds
+      // Resize watermark to cover the entire image (may crop watermark edges)
       const logoResized = await sharp(watermarkBuffer)
-        .resize(wmWidth, wmMaxHeight, { fit: 'inside', withoutEnlargement: true })
+        .resize(finalWidth, finalHeight, { fit: 'cover' })
         .png()  // Keep as PNG with alpha
         .toBuffer()
       
-      // Get final logo dimensions
-      const logoMetaFinal = await sharp(logoResized).metadata()
-      const logoW = logoMetaFinal.width || wmWidth
-      const logoH = logoMetaFinal.height || wmWidth
-      console.log('WM: Logo resized to:', logoW, 'x', logoH, '(channels:', logoMetaFinal.channels, ')')
-      
-      // Place watermark in the CENTER of the image (single watermark)
-      const centerX = Math.floor((finalWidth - logoW) / 2)
-      const centerY = Math.floor((finalHeight - logoH) / 2)
+      // Watermark is now exactly image size, so center = 0,0
+      const logoW = finalWidth
+      const logoH = finalHeight
+      const centerX = 0
+      const centerY = 0
       
       console.log('WM: Centering at X:', centerX, ', Y:', centerY)
       console.log('WM: Logo input type:', typeof logoResized, 'size:', logoResized.length)
