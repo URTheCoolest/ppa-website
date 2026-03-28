@@ -275,54 +275,11 @@ export default function LicenseRequestPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Media Details Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">{media.filename}</h1>
-          <div className="flex flex-wrap gap-4 text-sm text-gray-500 dark:text-gray-400">
-            <span className="flex items-center gap-1">
-              <Hash className="w-4 h-4" /> {media.media_id}
-            </span>
-            <span className="flex items-center gap-1">
-              {media.media_type === 'photo' ? '📷 Photo' : '🎬 Video'}
-            </span>
-            {media.category && (
-              <span className="flex items-center gap-1">
-                <Folder className="w-4 h-4" /> {media.category}
-              </span>
-            )}
-            {media.location && (
-              <span className="flex items-center gap-1">
-                <MapPin className="w-4 h-4" /> {media.location}
-              </span>
-            )}
-            {media.photographer && (
-              <span className="flex items-center gap-1">
-                <User className="w-4 h-4" /> {media.photographer.full_name || media.photographer.email}
-              </span>
-            )}
-            <span className="flex items-center gap-1">
-              <Calendar className="w-4 h-4" /> {new Date(media.created_at).toLocaleDateString()}
-            </span>
-          </div>
-          
-          {/* Keywords */}
-          {media.keywords && media.keywords.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-3">
-              {media.keywords.map((keyword, i) => (
-                <span key={i} className="px-2 py-1 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-xs rounded-full flex items-center gap-1">
-                  <Tag className="w-3 h-3" /> {keyword}
-                </span>
-              ))}
-            </div>
-          )}
-          
-          {media.description && (
-            <p className="mt-3 text-gray-600 dark:text-gray-400">{media.description}</p>
-          )}
-        </div>
+        {/* Name above image */}
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">{media.filename}</h1>
 
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Media Preview - Full width image, no rounded corners, actual aspect ratio */}
+          {/* Media Preview - Full width image */}
           <div className="lg:col-span-2">
             <div className="bg-gray-100 dark:bg-gray-900 relative">
               {(() => {
@@ -339,6 +296,54 @@ export default function LicenseRequestPage() {
                   </div>
                 )
               })()}
+            </div>
+            
+            {/* Description below image */}
+            {media.description && (
+              <div className="mt-6 p-4 bg-gray-50 dark:bg-[#1E1E1E] rounded-xl">
+                <p className="text-gray-600 dark:text-gray-400">{media.description}</p>
+              </div>
+            )}
+            
+            {/* Rest of info underneath */}
+            <div className="mt-6">
+              <div className="flex flex-wrap gap-4 text-sm text-gray-500 dark:text-gray-400">
+                <span className="flex items-center gap-1">
+                  <Hash className="w-4 h-4" /> {media.media_id}
+                </span>
+                <span className="flex items-center gap-1">
+                  {media.media_type === 'photo' ? '📷 Photo' : '🎬 Video'}
+                </span>
+                {media.category && (
+                  <span className="flex items-center gap-1">
+                    <Folder className="w-4 h-4" /> {media.category}
+                  </span>
+                )}
+                {media.location && (
+                  <span className="flex items-center gap-1">
+                    <MapPin className="w-4 h-4" /> {media.location}
+                  </span>
+                )}
+                {media.photographer && (
+                  <span className="flex items-center gap-1">
+                    <User className="w-4 h-4" /> {media.photographer.full_name || media.photographer.email}
+                  </span>
+                )}
+                <span className="flex items-center gap-1">
+                  <Calendar className="w-4 h-4" /> {new Date(media.created_at).toLocaleDateString()}
+                </span>
+              </div>
+              
+              {/* Keywords */}
+              {media.keywords && media.keywords.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {media.keywords.map((keyword, i) => (
+                    <span key={i} className="px-2 py-1 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-xs rounded-full flex items-center gap-1">
+                      <Tag className="w-3 h-3" /> {keyword}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

@@ -5,7 +5,13 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import ThemeToggle from '@/components/ThemeToggle'
-import { MapPin, Tag, Folder, CheckCircle, AlertCircle, Info, Upload } from 'lucide-react'
+import { MapPin, Tag, Folder, CheckCircle, AlertCircle, Info, Upload, User } from 'lucide-react'
+
+interface Photographer {
+  id: string
+  full_name: string
+  photographer_id: string | null
+}
 
 interface MediaFile {
   id: string
@@ -17,7 +23,7 @@ interface MediaFile {
   category: string
   location: string
   keywords: string
-  progress?: number  // Upload progress 0-100
+  progress?: number
 }
 
 const CATEGORIES = [
@@ -37,9 +43,9 @@ const CATEGORIES = [
   'Other'
 ]
 
-export default function UploadPage() {
-  const [profile, setProfile] = useState<any>(null)
-  const [user, setUser] = useState<any>(null)
+export default function AdminUploadPage() {
+  const [photographers, setPhotographers] = useState<Photographer[]>([])
+  const [selectedPhotographer, setSelectedPhotographer] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
@@ -92,39 +98,51 @@ export default function UploadPage() {
   }
 
   useEffect(() => {
-    checkUser()
+    checkAdmin()
   }, [])
 
-  const checkUser = async () => {
+  const checkAdmin = async () => {
     const { data: { user } } = await supabase.auth.getUser()
-    
     if (!user) {
       router.push('/login')
       return
     }
-
     const { data: profile } = await supabase
       .from('profiles')
-      .select('*')
+      .select('role')
       .eq('id', user.id)
       .single()
-
-    if (!profile || profile.role !== 'photographer') {
+    if (!profile || profile.role !== 'admin') {
       router.push('/login')
       return
     }
-
-    setProfile(profile)
-    setUser(user)
     
+    // Load photographers
+    const { data: photographerData } = await supabase
+      .from('profiles')
+      .select('id, full_name, photographer_id')
+      .eq('role', 'photographer')
+      .eq('is_approved', true)
+      .order('full_name', { ascending: true })
+    
+    if (photographerData) setPhotographers(photographerData)
+    setLoading(false)
+  }
+
+  const loadFolders = async (photographerId: string) => {
     const { data: folderData } = await supabase
       .from('media_folders')
       .select('*')
-      .eq('photographer_id', user.id)
+      .eq('photographer_id', photographerId)
       .order('created_at', { ascending: false })
 
     if (folderData) setFolders(folderData)
-    setLoading(false)
+  }
+
+  const handlePhotographerChange = (photographerId: string) => {
+    setSelectedPhotographer(photographerId)
+    setFolderId(null)
+    loadFolders(photographerId)
   }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -156,6 +174,8 @@ export default function UploadPage() {
   }
 
   const validateFiles = (): string | null => {
+    if (!selectedPhotographer) return 'Please select a photographer'
+    
     for (const file of files) {
       if (!file.category) return 'Please select a category for all files'
       if (!file.location || file.location.trim() === '') return 'Please add a location for all files'
@@ -170,6 +190,11 @@ export default function UploadPage() {
     
     if (files.length === 0) {
       setError('Please select at least one file')
+      return
+    }
+
+    if (!selectedPhotographer) {
+      setError('Please select a photographer')
       return
     }
 
@@ -198,7 +223,7 @@ export default function UploadPage() {
         const { data: folder, error: folderError } = await supabase
           .from('media_folders')
           .insert({
-            photographer_id: user.id,
+            photographer_id: selectedPhotographer,
             event_name: eventName,
           })
           .select()
@@ -212,7 +237,7 @@ export default function UploadPage() {
         const { data: folder, error: folderError } = await supabase
           .from('media_folders')
           .insert({
-            photographer_id: user.id,
+            photographer_id: selectedPhotographer,
             event_name: eventName || 'Uncategorized',
           })
           .select()
@@ -240,13 +265,11 @@ export default function UploadPage() {
 
       for (let i = 0; i < files.length; i++) {
         const mediaFile = files[i]
-        // Add timestamp suffix to ensure uniqueness across retry attempts
         const timestamp = Date.now().toString(36)
         const mediaId = `PPA-MEDIA-${String(nextNumber + i).padStart(5, '0')}-${timestamp}`
         const fileSizeMB = mediaFile.file.size / (1024 * 1024)
         
         // For files >= 4MB, use presigned URL (direct upload to Backblaze)
-        // This bypasses Vercel's 4.5MB body size limit
         if (fileSizeMB >= 4) {
           // Step 1: Get presigned PUT URL
           const urlResponse = await fetch('/api/upload-url', {
@@ -255,7 +278,7 @@ export default function UploadPage() {
             body: JSON.stringify({
               filename: mediaFile.file.name,
               contentType: mediaFile.file.type,
-              photographerId: user.id,
+              photographerId: selectedPhotographer,
               folderId: folderIdToUse || '',
               mediaId
             })
@@ -274,7 +297,7 @@ export default function UploadPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               filePath: urlData.key,
-              photographerId: user.id,
+              photographerId: selectedPhotographer,
               folderId: folderIdToUse || '',
               mediaId,
               filename: mediaFile.filename || '',
@@ -294,7 +317,7 @@ export default function UploadPage() {
           // Small files: use direct upload (existing method)
           const formData = new FormData()
           formData.append('file', mediaFile.file)
-          formData.append('photographerId', user.id)
+          formData.append('photographerId', selectedPhotographer)
           formData.append('folderId', folderIdToUse || '')
           formData.append('mediaId', mediaId)
           formData.append('filename', mediaFile.filename || '')
@@ -317,17 +340,14 @@ export default function UploadPage() {
       setSuccess(true)
       setFiles([])
       setEventName('')
+      setSelectedPhotographer('')
+      setFolderId(null)
       
     } catch (err: any) {
       setError(err.message)
     } finally {
       setUploading(false)
     }
-  }
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push('/login')
   }
 
   if (loading) return (
@@ -346,14 +366,8 @@ export default function UploadPage() {
                 <img src="/ppa-logo.png" alt="PPA Logo" className="h-10 w-auto" />
               </Link>
               <nav className="flex items-center gap-4">
+                <Link href="/admin" className="text-gray-600 dark:text-gray-300 text-sm hover:text-blue-600">← Admin</Link>
                 <ThemeToggle />
-                {profile?.avatar_url ? (
-                  <img src={profile.avatar_url} alt="Profile" className="w-9 h-9 rounded-full object-cover border-2 border-blue-500" />
-                ) : (
-                  <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center border-2 border-blue-500">
-                    <span className="text-white font-medium text-sm">{user?.email?.charAt(0).toUpperCase()}</span>
-                  </div>
-                )}
               </nav>
             </div>
           </div>
@@ -364,7 +378,7 @@ export default function UploadPage() {
           </div>
           <h2 className="text-2xl font-bold dark:text-white mb-2">Upload Complete!</h2>
           <p className="text-gray-600 dark:text-gray-400 mb-6">
-            Your media has been uploaded successfully and is now live on the marketplace.
+            Media has been uploaded successfully.
           </p>
           <div className="flex gap-4 justify-center">
             <button
@@ -374,10 +388,10 @@ export default function UploadPage() {
               Upload More
             </button>
             <Link
-              href="/photographer"
+              href="/admin/media"
               className="border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
             >
-              Go to Dashboard
+              View Media
             </Link>
           </div>
         </main>
@@ -395,34 +409,54 @@ export default function UploadPage() {
                 <img src="/ppa-logo.png" alt="PPA Logo" className="h-10 w-auto" />
               </Link>
               <span className="text-gray-500 dark:text-gray-400">|</span>
-              <Link href="/photographer" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white text-sm font-medium">
-                Dashboard
+              <Link href="/admin" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white text-sm font-medium">
+                Admin
               </Link>
+              <span className="text-gray-500 dark:text-gray-400">|</span>
+              <span className="text-blue-600 dark:text-blue-400 text-sm font-medium">Upload Media</span>
             </div>
             <nav className="flex items-center gap-4">
               <ThemeToggle />
-              {profile?.avatar_url ? (
-                <img src={profile.avatar_url} alt="Profile" className="w-9 h-9 rounded-full object-cover border-2 border-blue-500" />
-              ) : (
-                <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center border-2 border-blue-500">
-                  <span className="text-white font-medium text-sm">{user?.email?.charAt(0).toUpperCase()}</span>
-                </div>
-              )}
             </nav>
           </div>
         </div>
       </header>
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Upload Media</h1>
-        <p className="text-gray-600 dark:text-gray-400 mb-8">Share your work with the world. Fill in all required fields to publish.</p>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Upload Media (Admin)</h1>
+        <p className="text-gray-600 dark:text-gray-400 mb-8">Upload media on behalf of a photographer.</p>
+
+        {/* Photographer Selection */}
+        <div className="bg-white dark:bg-[#1E1E1E] border border-gray-200 dark:border-gray-700 rounded-xl p-6 mb-6">
+          <div className="flex items-center gap-3 mb-4">
+            <User className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            <h2 className="font-semibold dark:text-white">Select Photographer *</h2>
+          </div>
+          
+          <select
+            value={selectedPhotographer}
+            onChange={(e) => handlePhotographerChange(e.target.value)}
+            className={`w-full p-3 border rounded-lg bg-white dark:bg-[#2A2A2A] dark:text-white ${
+              !selectedPhotographer 
+                ? 'border-red-300 dark:border-red-700' 
+                : 'border-gray-200 dark:border-gray-700'
+            }`}
+          >
+            <option value="">Choose a photographer...</option>
+            {photographers.map(photographer => (
+              <option key={photographer.id} value={photographer.id}>
+                {photographer.full_name || photographer.photographer_id || 'Unknown'}
+              </option>
+            ))}
+          </select>
+        </div>
 
         {/* SOP Guide */}
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-6 mb-8">
           <div className="flex items-start gap-3">
             <Info className="w-6 h-6 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
             <div>
-              <h3 className="font-semibold text-blue-900 dark:text-blue-300 mb-3">Before Publishing - Required Information</h3>
+              <h3 className="font-semibold text-blue-900 dark:text-blue-300 mb-3">Required Information</h3>
               <div className="grid md:grid-cols-3 gap-4 text-sm">
                 <div className="flex items-start gap-2">
                   <MapPin className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5" />
@@ -512,6 +546,15 @@ export default function UploadPage() {
                         </button>
                       </div>
                       
+                      {/* Description - Required */}
+                      <input
+                        type="text"
+                        value={file.description}
+                        onChange={(e) => updateFile(file.id, 'description', e.target.value)}
+                        placeholder="Description (min 15 chars) *"
+                        className={`w-full p-2 border rounded-lg bg-white dark:bg-[#2A2A2A] dark:text-white text-sm ${!file.description || file.description.length < 15 ? 'border-red-300 dark:border-red-700' : 'border-gray-200 dark:border-gray-700'}`}
+                      />
+                      
                       {/* Required Fields - Location, Keywords, Category */}
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                         <div className="relative">
@@ -557,13 +600,6 @@ export default function UploadPage() {
                           onChange={(e) => updateFile(file.id, 'shooting_date', e.target.value)}
                           className="p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-[#2A2A2A] dark:text-white text-sm"
                         />
-                        <input
-                          type="text"
-                          value={file.description}
-                          onChange={(e) => updateFile(file.id, 'description', e.target.value)}
-                          placeholder="Description (min 15 chars) *"
-                          className={`p-2 border rounded-lg bg-white dark:bg-[#2A2A2A] dark:text-white text-sm ${!file.description || file.description.length < 15 ? 'border-red-300 dark:border-red-700' : 'border-gray-200 dark:border-gray-700'}`}
-                        />
                       </div>
                       
                       {/* Progress Bar */}
@@ -589,7 +625,7 @@ export default function UploadPage() {
           )}
 
           {/* Folder Selection */}
-          {files.length > 0 && (
+          {files.length > 0 && selectedPhotographer && (
             <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 bg-white dark:bg-[#1E1E1E]">
               <h3 className="font-semibold dark:text-white mb-3">Event / Folder</h3>
               
@@ -648,7 +684,7 @@ export default function UploadPage() {
             </div>
           )}
 
-          {files.length > 0 && (
+          {files.length > 0 && selectedPhotographer && (
             <button
               type="submit"
               disabled={uploading}

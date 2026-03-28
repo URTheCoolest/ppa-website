@@ -18,7 +18,8 @@ import {
   CheckCircle,
   Star,
   Award,
-  BarChart3
+  BarChart3,
+  Upload
 } from 'lucide-react'
 
 interface Stats {
@@ -484,6 +485,10 @@ export default function AdminDashboard() {
             <div className="bg-white dark:bg-[#1E1E1E] p-6 rounded-xl border border-gray-200 dark:border-gray-700">
               <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Quick Links</h3>
               <div className="grid grid-cols-2 gap-3">
+                <Link href="/admin/upload" className="flex items-center gap-2 p-3 rounded-lg bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-700 dark:text-gray-300">
+                  <Upload className="w-5 h-5" />
+                  Upload Media
+                </Link>
                 <Link href="/admin/users" className="flex items-center gap-2 p-3 rounded-lg bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-700 dark:text-gray-300">
                   <Users className="w-5 h-5" />
                   Manage Users
@@ -495,10 +500,6 @@ export default function AdminDashboard() {
                 <Link href="/admin/partners" className="flex items-center gap-2 p-3 rounded-lg bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-700 dark:text-gray-300">
                   <Award className="w-5 h-5" />
                   Partners
-                </Link>
-                <Link href="/admin/settings" className="flex items-center gap-2 p-3 rounded-lg bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-700 dark:text-gray-300">
-                  <BarChart3 className="w-5 h-5" />
-                  Settings
                 </Link>
               </div>
             </div>
